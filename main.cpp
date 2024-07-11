@@ -7,6 +7,7 @@
 
 int main(int argc, char** argv)
 {
-	CrackWeChatMsgDBPassword("I:\\WorkProject2022\\ChatShadow\\ChatShadow\\ChatShadow\\Data\\WeChat.DMP", "I:\\WorkProject2022\\ChatShadow\\ChatShadow\\ChatShadow\\Data\\MSG0.db");
+	CrackWeChatMsgDBFile("I:\\WorkProject2022\\ChatShadow\\ChatShadow\\ChatShadow\\Data\\WeChat.DMP", "I:\\WorkProject2022\\ChatShadow\\ChatShadow\\ChatShadow\\Data\\MSG0.db",
+		"I:\\WorkProject2022\\ChatShadow\\ChatShadow\\ChatShadow\\Data\\MSG0_DE.db", "I:\\WorkProject2022\\ChatShadow\\ChatShadow\\ChatShadow\\Data\\Password", 8);
 	return 0;
 }

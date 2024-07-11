@@ -15,6 +15,6 @@
 //√‹‘ø≥§∂»
 #define WECHAT_PASSWORD_SIZE 32
 
-BOOL CrackWeChatMsgDBPassword(const CHAR* szMemoryFilePath, const CHAR* szWeChatMsgDbFilePath);
+BOOL CrackWeChatMsgDBFile(const CHAR* szMemoryFilePath, const CHAR* szWeChatMsgDBFilePath, const CHAR* szDecWeChatMsgDBFilePath, const CHAR* szPasswordFilePath, int ThreadNum);
 BOOL DecryptWeChatMsgDBFile(BYTE* Password, const CHAR* szWeChatMsgDBFilePath, const CHAR* szDecDBFilePath);
 BOOL CheckingWeChatMsgDBPassword(BYTE* CheckingData, int CheckingDataLength, BYTE* DBData, int DBDataLength);

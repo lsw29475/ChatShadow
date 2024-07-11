@@ -6,6 +6,88 @@
 #include <openssl/aes.h>
 #include <openssl/hmac.h>
 
+BOOL CrackWeChatMsgDBPassword(const CHAR* szMemoryFilePath, const CHAR* szWeChatMsgDBFilePath, const CHAR* szPasswordFilePath, int ThreadNum)
+{
+	HANDLE hDBFile = INVALID_HANDLE_VALUE;
+	BYTE PageData[WECHAT_PAGE_SIZE] = { 0x00 };
+
+	HANDLE hMemFile = INVALID_HANDLE_VALUE;
+	HANDLE hMemMappingFile = INVALID_HANDLE_VALUE;
+	LPVOID pMappingFileData = NULL;
+	LARGE_INTEGER FileSize;
+	BYTE* pMemFileData = NULL;
+
+	hDBFile = CreateFileA(szWeChatMsgDBFilePath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hDBFile == INVALID_HANDLE_VALUE)
+	{
+		printf("CreateFileA open %s fail, error: %d\n", szWeChatMsgDBFilePath, GetLastError());
+		return FALSE;
+	}
+
+	memset(PageData, 0x00, sizeof(PageData));
+	if (!ReadFile(hDBFile, PageData, sizeof(PageData), NULL, NULL))
+	{
+		CloseHandle(hDBFile);
+		return FALSE;
+	}
+	CloseHandle(hDBFile);
+
+	hMemFile = CreateFileA(szMemoryFilePath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hMemFile == INVALID_HANDLE_VALUE)
+	{
+		printf("CreateFileA open %s fail, error: %d\n", szMemoryFilePath, GetLastError());
+		return FALSE;
+	}
+	FileSize.LowPart = GetFileSize(hMemFile, (DWORD*)&FileSize.HighPart);
+
+	hMemMappingFile = CreateFileMappingA(hMemFile, NULL, PAGE_READONLY, 0, 0, NULL);
+	if (hMemMappingFile == NULL)
+	{
+		printf("Failed to create file mapping. Error: %lu\n", GetLastError());
+		CloseHandle(hMemFile);
+		return FALSE;
+	}
+
+	pMappingFileData = MapViewOfFile(hMemMappingFile, FILE_MAP_READ, 0, 0, 0);
+	if (pMappingFileData == NULL)
+	{
+		printf("Failed to map view of file. Error: %lu\n", GetLastError());
+		CloseHandle(hMemMappingFile);
+		CloseHandle(hMemFile);
+		return FALSE;
+	}
+
+	return CrackingDBFile(pMappingFileData, FileSize, PageData, WECHAT, szPasswordFilePath, ThreadNum);
+}
+
+BOOL CrackWeChatMsgDBFile(const CHAR* szMemoryFilePath, const CHAR* szWeChatMsgDBFilePath, const CHAR* szDecWeChatMsgDBFilePath, const CHAR* szPasswordFilePath, int ThreadNum)
+{
+	HANDLE hPasswordFile = INVALID_HANDLE_VALUE;
+	BYTE szPassword[WECHAT_PASSWORD_SIZE] = { 0x00 };
+
+	if (!CrackWeChatMsgDBPassword(szMemoryFilePath, szWeChatMsgDBFilePath, szPasswordFilePath, ThreadNum))
+	{
+		return FALSE;
+	}
+
+	hPasswordFile = CreateFileA(szPasswordFilePath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hPasswordFile == INVALID_HANDLE_VALUE)
+	{
+		printf("CreateFileA open password file %s fail, error: %d\n", szPasswordFilePath, GetLastError());
+		return FALSE;
+	}
+
+	ReadFile(hPasswordFile, szPassword, WECHAT_PASSWORD_SIZE, NULL, NULL);
+	CloseHandle(hPasswordFile);
+
+	if (!DecryptWeChatMsgDBFile(szPassword, szWeChatMsgDBFilePath, szDecWeChatMsgDBFilePath))
+	{
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
 BOOL CheckingWeChatMsgDBPassword(BYTE *CheckingData, int CheckingDataLength, BYTE *DBData, int DBDataLength)
 {
 	BYTE DecKey[32] = {0x00};
@@ -148,58 +230,4 @@ BOOL DecryptWeChatMsgDBFile(BYTE *Password, const CHAR *szWeChatMsgDBFilePath, c
 	CloseHandle(hDecDBFile);
 	CloseHandle(hDBFile);
 	return TRUE;
-}
-
-BOOL CrackWeChatMsgDBPassword(const CHAR *szMemoryFilePath, const CHAR *szWeChatMsgDBFilePath)
-{
-	HANDLE hDBFile = INVALID_HANDLE_VALUE;
-	BYTE PageData[WECHAT_PAGE_SIZE] = {0x00};
-
-	HANDLE hMemFile = INVALID_HANDLE_VALUE;
-	HANDLE hMemMappingFile = INVALID_HANDLE_VALUE;
-	LPVOID pMappingFileData = NULL;
-	LARGE_INTEGER FileSize;
-	BYTE *pMemFileData = NULL;
-
-	hDBFile = CreateFileA(szWeChatMsgDBFilePath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (hDBFile == INVALID_HANDLE_VALUE)
-	{
-		printf("CreateFileA open %s fail, error: %d\n", szWeChatMsgDBFilePath, GetLastError());
-		return FALSE;
-	}
-
-	memset(PageData, 0x00, sizeof(PageData));
-	if (!ReadFile(hDBFile, PageData, sizeof(PageData), NULL, NULL))
-	{
-		CloseHandle(hDBFile);
-		return FALSE;
-	}
-	CloseHandle(hDBFile);
-
-	hMemFile = CreateFileA(szMemoryFilePath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (hMemFile == INVALID_HANDLE_VALUE)
-	{
-		printf("CreateFileA open %s fail, error: %d\n", szMemoryFilePath, GetLastError());
-		return FALSE;
-	}
-	FileSize.LowPart = GetFileSize(hMemFile, (DWORD *)&FileSize.HighPart);
-
-	hMemMappingFile = CreateFileMappingA(hMemFile, NULL, PAGE_READONLY, 0, 0, NULL);
-	if (hMemMappingFile == NULL)
-	{
-		printf("Failed to create file mapping. Error: %lu\n", GetLastError());
-		CloseHandle(hMemFile);
-		return FALSE;
-	}
-
-	pMappingFileData = MapViewOfFile(hMemMappingFile, FILE_MAP_READ, 0, 0, 0);
-	if (pMappingFileData == NULL)
-	{
-		printf("Failed to map view of file. Error: %lu\n", GetLastError());
-		CloseHandle(hMemMappingFile);
-		CloseHandle(hMemFile);
-		return FALSE;
-	}
-
-	return CrackingDBFile(pMappingFileData, FileSize, PageData, WECHAT, 8);
 }

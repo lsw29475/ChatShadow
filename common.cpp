@@ -17,6 +17,7 @@ typedef struct _CRACKING_ARGS
 	HANDLE hStopEvent;
 	int ThreadId;
 	ULONGLONG StartTime;
+	CHAR szPasswordFilePath[MAX_PATH];
 } CRACKING_ARGS, *PCRACKING_ARGS;
 
 BOOL CheckSQLiteDBHeader(const char *szDBFilePath)
@@ -88,8 +89,16 @@ DWORD WINAPI CrackingThread(LPVOID lpParam)
 
 		if (pCrackingArgs->CheckingFunction((BYTE *)pCrackingArgs->pMappingFileData + pos, pCrackingArgs->PasswordSize, (BYTE *)pCrackingArgs->PageData, pCrackingArgs->PageDataSize))
 		{
-			printf("Thread %d: Find password, pos: %llx\n", pCrackingArgs->ThreadId, pos + (pCrackingArgs->ThreadId - 1) * pCrackingArgs->MappingFileDataSize);
 			SetEvent(pCrackingArgs->hStopEvent);
+			printf("Thread %d: Find password, pos: %llx\n", pCrackingArgs->ThreadId, pos + (pCrackingArgs->ThreadId - 1) * pCrackingArgs->MappingFileDataSize);
+			printf("password: ");
+			for (int j = 0; j < pCrackingArgs->PasswordSize; j++)
+			{
+				printf("%02X ", *(BYTE*)((BYTE*)pCrackingArgs->pMappingFileData + pos + j));
+			}
+			HANDLE hOutPut = CreateFileA(pCrackingArgs->szPasswordFilePath, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+			WriteFile(hOutPut, (BYTE*)pCrackingArgs->pMappingFileData + pos, pCrackingArgs->PasswordSize, NULL, NULL);
+			CloseHandle(hOutPut);
 			return 1;
 		}
 
@@ -106,7 +115,7 @@ DWORD WINAPI CrackingThread(LPVOID lpParam)
 	return 0;
 }
 
-BOOL CrackingDBFile(LPVOID pMappingFileData, LARGE_INTEGER FileSize, BYTE *PageData, CHAT_TYPE ChatType, int ThreadNum)
+BOOL CrackingDBFile(LPVOID pMappingFileData, LARGE_INTEGER FileSize, BYTE *PageData, CHAT_TYPE ChatType, const CHAR* szPasswordFilePath, int ThreadNum)
 {
 	CRACKING_ARGS *pCrackingArgs;
 	HANDLE *hThreads;
@@ -143,6 +152,7 @@ BOOL CrackingDBFile(LPVOID pMappingFileData, LARGE_INTEGER FileSize, BYTE *PageD
 		pCrackingArgs[i].ThreadId = i + 1;
 		pCrackingArgs[i].StartTime = GetTickCount64();
 		pCrackingArgs[i].TotalMappingFileDataSize = FileSize.QuadPart;
+		memcpy(pCrackingArgs[i].szPasswordFilePath, szPasswordFilePath, strlen(szPasswordFilePath));
 		switch (ChatType)
 		{
 		case WECHAT:
@@ -166,12 +176,7 @@ BOOL CrackingDBFile(LPVOID pMappingFileData, LARGE_INTEGER FileSize, BYTE *PageD
 		}
 	}
 
-	DWORD result = WaitForMultipleObjects(ThreadNum, hThreads, FALSE, INFINITE);
-	if (result >= WAIT_OBJECT_0 && result < WAIT_OBJECT_0 + ThreadNum)
-	{
-		printf("found the password.\n", result - WAIT_OBJECT_0);
-	}
-
+	WaitForMultipleObjects(ThreadNum, hThreads, FALSE, INFINITE);
 	for (int i = 0; i < ThreadNum; i++)
 	{
 		CloseHandle(hThreads[i]);
