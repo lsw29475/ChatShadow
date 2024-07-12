@@ -89,7 +89,6 @@ DWORD WINAPI CrackingThread(LPVOID lpParam)
 
 		if (pCrackingArgs->CheckingFunction((BYTE *)pCrackingArgs->pMappingFileData + pos, pCrackingArgs->PasswordSize, (BYTE *)pCrackingArgs->PageData, pCrackingArgs->PageDataSize))
 		{
-			SetEvent(pCrackingArgs->hStopEvent);
 			printf("Thread %d: Find password, pos: %llx\n", pCrackingArgs->ThreadId, pos + (pCrackingArgs->ThreadId - 1) * pCrackingArgs->MappingFileDataSize);
 			printf("password: ");
 			for (int j = 0; j < pCrackingArgs->PasswordSize; j++)
@@ -99,6 +98,7 @@ DWORD WINAPI CrackingThread(LPVOID lpParam)
 			HANDLE hOutPut = CreateFileA(pCrackingArgs->szPasswordFilePath, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 			WriteFile(hOutPut, (BYTE*)pCrackingArgs->pMappingFileData + pos, pCrackingArgs->PasswordSize, NULL, NULL);
 			CloseHandle(hOutPut);
+			SetEvent(pCrackingArgs->hStopEvent);
 			return 1;
 		}
 
