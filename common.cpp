@@ -18,7 +18,36 @@ typedef struct _CRACKING_ARGS
 	int ThreadId;
 	ULONGLONG StartTime;
 	CHAR szPasswordFilePath[MAX_PATH];
+	CHAR szTaskDir[MAX_PATH];
 } CRACKING_ARGS, *PCRACKING_ARGS;
+
+VOID GetDirectoryFromFilePath(const CHAR *filePath, CHAR *directoryPath)
+{
+	const CHAR *lastSlash = strrchr(filePath, '\\');
+
+	if (lastSlash == NULL)
+	{
+		strcpy(directoryPath, "");
+		return;
+	}
+
+	strncpy(directoryPath, filePath, lastSlash - filePath);
+	directoryPath[lastSlash - filePath] = '\0';
+}
+
+VOID SaveCrackingStatus(CRACKING_ARGS *pCrackingArgs)
+{
+	CHAR szStatusFilePath[MAX_PATH];
+	HANDLE hStatusFile = INVALID_HANDLE_VALUE;
+
+	sprintf_s(szStatusFilePath, "%s\\Staus.txt", pCrackingArgs->szTaskDir);
+	hStatusFile = CreateFileA(szStatusFilePath, GENERIC_WRITE, FILE_SHARE_WRITE | FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hStatusFile == INVALID_HANDLE_VALUE)
+	{
+		printf("CreateFileA open %s fail, error: %d\n", szStatusFilePath, GetLastError());
+		return;
+	}
+}
 
 BOOL CheckSQLiteDBHeader(const char *szDBFilePath)
 {
@@ -122,6 +151,7 @@ BOOL CrackingDBFile(LPVOID pMappingFileData, LARGE_INTEGER FileSize, BYTE *PageD
 	HANDLE hStopEvent;
 	int AlignSize;
 	DWORD dwThreadId;
+	CHAR szTaskDir[MAX_PATH];
 
 	AlignSize = FileSize.LowPart / ThreadNum;
 
@@ -143,6 +173,7 @@ BOOL CrackingDBFile(LPVOID pMappingFileData, LARGE_INTEGER FileSize, BYTE *PageD
 		return FALSE;
 	}
 
+	GetDirectoryFromFilePath(szPasswordFilePath, szTaskDir);
 	for (int i = 0; i < ThreadNum; i++)
 	{
 		pCrackingArgs[i].pMappingFileData = (BYTE *)pMappingFileData + i * AlignSize;
@@ -153,6 +184,7 @@ BOOL CrackingDBFile(LPVOID pMappingFileData, LARGE_INTEGER FileSize, BYTE *PageD
 		pCrackingArgs[i].StartTime = GetTickCount64();
 		pCrackingArgs[i].TotalMappingFileDataSize = FileSize.QuadPart;
 		memcpy(pCrackingArgs[i].szPasswordFilePath, szPasswordFilePath, strlen(szPasswordFilePath));
+		memcpy(pCrackingArgs[i].szTaskDir, szTaskDir, strlen(szTaskDir));
 		switch (ChatType)
 		{
 		case WECHAT:
