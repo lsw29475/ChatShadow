@@ -1,5 +1,5 @@
 #include "common.h"
-#include "WeChat.h"
+#include "WeChat/WeChat.h"
 
 #include <stdio.h>
 #include <time.h>
@@ -43,7 +43,7 @@ BOOL CheckSQLiteDBHeader(const char *szDBFilePath)
 	return TRUE;
 }
 
-BOOL FilterPos(BYTE* pos)
+BOOL FilterPos(BYTE *pos)
 {
 	int i = 0;
 
@@ -77,7 +77,7 @@ DWORD WINAPI CrackingThread(LPVOID lpParam)
 
 	for (int pos = 0; pos < pCrackingArgs->MappingFileDataSize; pos++)
 	{
-		if (!FilterPos((BYTE*)pCrackingArgs->pMappingFileData + pos))
+		if (!FilterPos((BYTE *)pCrackingArgs->pMappingFileData + pos))
 		{
 			continue;
 		}
@@ -93,10 +93,10 @@ DWORD WINAPI CrackingThread(LPVOID lpParam)
 			printf("password: ");
 			for (int j = 0; j < pCrackingArgs->PasswordSize; j++)
 			{
-				printf("%02X ", *(BYTE*)((BYTE*)pCrackingArgs->pMappingFileData + pos + j));
+				printf("%02X ", *(BYTE *)((BYTE *)pCrackingArgs->pMappingFileData + pos + j));
 			}
 			HANDLE hOutPut = CreateFileA(pCrackingArgs->szPasswordFilePath, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-			WriteFile(hOutPut, (BYTE*)pCrackingArgs->pMappingFileData + pos, pCrackingArgs->PasswordSize, NULL, NULL);
+			WriteFile(hOutPut, (BYTE *)pCrackingArgs->pMappingFileData + pos, pCrackingArgs->PasswordSize, NULL, NULL);
 			CloseHandle(hOutPut);
 			SetEvent(pCrackingArgs->hStopEvent);
 			return 1;
@@ -107,15 +107,15 @@ DWORD WINAPI CrackingThread(LPVOID lpParam)
 			GetLocalTime(&LocalTime);
 			double progress = (double)pos / pCrackingArgs->MappingFileDataSize * 100;
 			printf("%02d:%02d:%02d.%03d---Thread %d: pos: %llx/%llx  Progress %.2f%%  Time Elapsed: %llu s\n", LocalTime.wHour, LocalTime.wMinute, LocalTime.wSecond, LocalTime.wMilliseconds, pCrackingArgs->ThreadId,
-				pos + (pCrackingArgs->ThreadId - 1) * pCrackingArgs->MappingFileDataSize, pCrackingArgs->TotalMappingFileDataSize, progress, 
-				(GetTickCount64() - pCrackingArgs->StartTime) / 1000);
+				   pos + (pCrackingArgs->ThreadId - 1) * pCrackingArgs->MappingFileDataSize, pCrackingArgs->TotalMappingFileDataSize, progress,
+				   (GetTickCount64() - pCrackingArgs->StartTime) / 1000);
 		}
 	}
 
 	return 0;
 }
 
-BOOL CrackingDBFile(LPVOID pMappingFileData, LARGE_INTEGER FileSize, BYTE *PageData, CHAT_TYPE ChatType, const CHAR* szPasswordFilePath, int ThreadNum)
+BOOL CrackingDBFile(LPVOID pMappingFileData, LARGE_INTEGER FileSize, BYTE *PageData, CHAT_TYPE ChatType, const CHAR *szPasswordFilePath, int ThreadNum)
 {
 	CRACKING_ARGS *pCrackingArgs;
 	HANDLE *hThreads;
@@ -186,4 +186,39 @@ BOOL CrackingDBFile(LPVOID pMappingFileData, LARGE_INTEGER FileSize, BYTE *PageD
 	free(hThreads);
 
 	return TRUE;
+}
+
+VOID DeleteDirectory(const CHAR *Path)
+{
+	WIN32_FIND_DATAA FindFileData;
+	HANDLE hFind = INVALID_HANDLE_VALUE;
+	CHAR DirPath[MAX_PATH];
+	CHAR FilePath[MAX_PATH];
+
+	sprintf_s(DirPath, "%s\\*", Path);
+	hFind = FindFirstFileA(DirPath, &FindFileData);
+	if (hFind == INVALID_HANDLE_VALUE)
+	{
+		return;
+	}
+
+	do
+	{
+		if (strcmp(FindFileData.cFileName, ".") != 0 && strcmp(FindFileData.cFileName, "..") != 0)
+		{
+			sprintf_s(FilePath, "%s\\%s", Path, FindFileData.cFileName);
+
+			if (FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+			{
+				DeleteDirectory(FilePath);
+			}
+			else
+			{
+				DeleteFileA(FilePath);
+			}
+		}
+	} while (FindNextFileA(hFind, &FindFileData) != 0);
+
+	FindClose(hFind);
+	RemoveDirectoryA(Path);
 }

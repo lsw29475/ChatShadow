@@ -1,4 +1,4 @@
-#include "WeChat.h"
+#include "task.h"
 
 #pragma comment(lib, "libcrypto.lib")
 #pragma comment(lib, "libssl.lib")
@@ -7,7 +7,15 @@
 
 int main(int argc, char** argv)
 {
-	CrackWeChatMsgDBFile("I:\\WorkProject2022\\ChatShadow\\ChatShadow\\ChatShadow\\Data\\WeChat_lsj.DMP", "I:\\WorkProject2022\\ChatShadow\\ChatShadow\\ChatShadow\\Data\\Applet_lsj.db",
-		"I:\\WorkProject2022\\ChatShadow\\ChatShadow\\ChatShadow\\Data\\Applet_lsj_DE.db", "I:\\WorkProject2022\\ChatShadow\\ChatShadow\\ChatShadow\\Data\\Password_lsj", 8);
+	CRACK_TASK CrackTask;
+
+	memcpy(CrackTask.szMemoryFilePath, "I:\\WorkProject2022\\ChatShadow\\ChatShadow\\ChatShadow\\Data\\WeChat_lsj.DMP", strlen("I:\\WorkProject2022\\ChatShadow\\ChatShadow\\ChatShadow\\Data\\WeChat_lsj.DMP"));
+	memcpy(CrackTask.szMsgDBFilePath, "I:\\WorkProject2022\\ChatShadow\\ChatShadow\\ChatShadow\\Data\\Applet_lsj.db", strlen("I:\\WorkProject2022\\ChatShadow\\ChatShadow\\ChatShadow\\Data\\Applet_lsj.db"));
+	memcpy(CrackTask.szTaskDir, "I:\\WorkProject2022\\ChatShadow\\ChatShadow\\ChatShadow\\Data\\Task", strlen("I:\\WorkProject2022\\ChatShadow\\ChatShadow\\ChatShadow\\Data\\Task"));
+	CrackTask.TaskType = WECHAT;
+	CrackTask.ThreadNum = 8;
+
+	CreateNewCrackTask(&CrackTask);
+	
 	return 0;
 }
