@@ -7,6 +7,24 @@ typedef enum _CHAT_TYPE
 	WECHAT
 } CHAT_TYPE, *PCHAT_TYPE;
 
+typedef struct _CRACKING_ARGS
+{
+	PVOID pMappingFileData;
+	int MappingFileDataSize;
+	ULONGLONG TotalMappingFileDataSize;
+	int PasswordSize;
+	PVOID PageData;
+	int PageDataSize;
+	BOOL(*CheckingFunction)
+	(BYTE *, int, BYTE *, int);
+	HANDLE hStopEvent;
+	int ThreadId;
+	int ThreadNum;
+	ULONGLONG StartTime;
+	CHAR szPasswordFilePath[MAX_PATH];
+	CHAR szTaskDir[MAX_PATH];
+} CRACKING_ARGS, *PCRACKING_ARGS;
+
 #define SQLITE_FILE_HEADER "SQLite format 3" 
 #define SQLITE_FILE_HEADER_SIZE 16
 
