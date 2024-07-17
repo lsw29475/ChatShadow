@@ -6,7 +6,7 @@
 #include <openssl/aes.h>
 #include <openssl/hmac.h>
 
-BOOL CrackWeChatMsgDBPassword(const CHAR* szMemoryFilePath, const CHAR* szWeChatMsgDBFilePath, const CHAR* szPasswordFilePath, int ThreadNum)
+BOOL CrackWeChatMsgDBPassword(const CHAR* szMemoryFilePath, const CHAR* szWeChatMsgDBFilePath, const CHAR* szPasswordFilePath, int ThreadNum, BOOL blResume)
 {
 	HANDLE hDBFile = INVALID_HANDLE_VALUE;
 	BYTE PageData[WECHAT_PAGE_SIZE] = { 0x00 };
@@ -57,15 +57,15 @@ BOOL CrackWeChatMsgDBPassword(const CHAR* szMemoryFilePath, const CHAR* szWeChat
 		return FALSE;
 	}
 
-	return CrackingDBFile(pMappingFileData, FileSize, PageData, WECHAT, szPasswordFilePath, ThreadNum);
+	return CrackingDBFile(pMappingFileData, FileSize, PageData, WECHAT, szPasswordFilePath, ThreadNum, blResume);
 }
 
-BOOL CrackWeChatMsgDBFile(const CHAR* szMemoryFilePath, const CHAR* szWeChatMsgDBFilePath, const CHAR* szDecWeChatMsgDBFilePath, const CHAR* szPasswordFilePath, int ThreadNum)
+BOOL CrackWeChatMsgDBFile(const CHAR* szMemoryFilePath, const CHAR* szWeChatMsgDBFilePath, const CHAR* szDecWeChatMsgDBFilePath, const CHAR* szPasswordFilePath, int ThreadNum, BOOL blResume)
 {
 	HANDLE hPasswordFile = INVALID_HANDLE_VALUE;
 	BYTE szPassword[WECHAT_PASSWORD_SIZE] = { 0x00 };
 
-	if (!CrackWeChatMsgDBPassword(szMemoryFilePath, szWeChatMsgDBFilePath, szPasswordFilePath, ThreadNum))
+	if (!CrackWeChatMsgDBPassword(szMemoryFilePath, szWeChatMsgDBFilePath, szPasswordFilePath, ThreadNum, blResume))
 	{
 		return FALSE;
 	}
@@ -101,7 +101,7 @@ BOOL CheckingWeChatMsgDBPassword(BYTE *CheckingData, int CheckingDataLength, BYT
 	OSSL_PARAM params[2];
 	int i;
 
-	// ³õÊ¼»¯Ëã·¨
+	// ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ã·¨
 	static int openssl_initialized = 0;
 	if (!openssl_initialized)
 	{
@@ -109,19 +109,19 @@ BOOL CheckingWeChatMsgDBPassword(BYTE *CheckingData, int CheckingDataLength, BYT
 		openssl_initialized = 1;
 	}
 
-	// Éú³É½âÃÜÃÜÔ¿
+	// ï¿½ï¿½ï¿½É½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¿
 	PKCS5_PBKDF2_HMAC_SHA1((const char *)CheckingData, CheckingDataLength, DBData, WECHAT_SALT_SIZE, WECHAT_DEFAULT_ITER, sizeof(DecKey), DecKey);
 
-	// Éú³ÉMacSalt
+	// ï¿½ï¿½ï¿½ï¿½MacSalt
 	for (i = 0; i < WECHAT_SALT_SIZE; i++)
 	{
 		MacSalt[i] = DBData[i] ^ 0x3a;
 	}
 
-	// Éú³ÉMACÃÜÔ¿
+	// ï¿½ï¿½ï¿½ï¿½MACï¿½ï¿½Ô¿
 	PKCS5_PBKDF2_HMAC_SHA1((const char *)DecKey, sizeof(DecKey), MacSalt, sizeof(MacSalt), 2, sizeof(MacKey), MacKey);
 
-	// ³õÊ¼»¯HMAC
+	// ï¿½ï¿½Ê¼ï¿½ï¿½HMAC
 	hmac = EVP_MAC_fetch(NULL, "HMAC", NULL);
 	if (hmac == NULL)
 	{
@@ -145,7 +145,7 @@ BOOL CheckingWeChatMsgDBPassword(BYTE *CheckingData, int CheckingDataLength, BYT
 		return FALSE;
 	}
 
-	// ¼ÆËãHMAC
+	// ï¿½ï¿½ï¿½ï¿½HMAC
 	if (EVP_MAC_update(ctx, DBData + WECHAT_SALT_SIZE, WECHAT_PAGE_SIZE - WECHAT_PAGE_REVERSED - WECHAT_SALT_SIZE) != 1 ||
 		EVP_MAC_update(ctx, (const unsigned char *)&nPage, sizeof(nPage)) != 1 ||
 		EVP_MAC_final(ctx, HashKey, &HashLen, sizeof(HashKey)) != 1)
@@ -155,11 +155,11 @@ BOOL CheckingWeChatMsgDBPassword(BYTE *CheckingData, int CheckingDataLength, BYT
 		return FALSE;
 	}
 
-	// ÇåÀí
+	// ï¿½ï¿½ï¿½ï¿½
 	EVP_MAC_CTX_free(ctx);
 	EVP_MAC_free(hmac);
 
-	// ±È½Ï¼ÆËã³öµÄHMACÓëÊý¾Ý¿âÖÐµÄHMAC
+	// ï¿½È½Ï¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½HMACï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½Ðµï¿½HMAC
 	return !memcmp(HashKey, DBData + WECHAT_PAGE_SIZE - WECHAT_PAGE_REVERSED, HashLen);
 }
 
