@@ -42,9 +42,14 @@ BOOL CheckSQLiteDBHeader(const char *szDBFilePath)
 	return TRUE;
 }
 
-BOOL FilterPos(BYTE *pos)
+BOOL FilterPos(BYTE *Pos)
 {
 	int i = 0;
+
+	if (Pos[0] == Pos[1] && Pos[1] == Pos[2])
+	{
+		return FALSE;
+	}
 
 	for (int z = 0; z <= 0xFF; z++)
 	{
@@ -52,7 +57,7 @@ BOOL FilterPos(BYTE *pos)
 
 		for (int j = 0; j < 0x20; j++)
 		{
-			if (pos[j] == z)
+			if (Pos[j] == z)
 			{
 				i++;
 			}
@@ -73,8 +78,16 @@ DWORD WINAPI CrackingThread(LPVOID lpParam)
 	int progressInterval = 1000;
 	int counter = 0;
 	SYSTEMTIME LocalTime;
+	int Pos = 0;
 
-	for (int Pos = 0; Pos < pCrackingArgs->MappingFileDataSize; Pos++)
+	if (pCrackingArgs->blResume)
+	{
+		CHAR szStatusFilePath[MAX_PATH] = {0x00};
+		sprintf_s(szStatusFilePath, "%s\\Status.txt", pCrackingArgs->szTaskDir);
+		Pos = GetLastPosFromStatusFile(szStatusFilePath, pCrackingArgs->ThreadId);
+	}
+
+	for (; Pos < pCrackingArgs->MappingFileDataSize; Pos++)
 	{
 		if (!FilterPos((BYTE *)pCrackingArgs->pMappingFileData + Pos))
 		{
@@ -115,14 +128,14 @@ DWORD WINAPI CrackingThread(LPVOID lpParam)
 	return 0;
 }
 
-BOOL CrackingDBFile(LPVOID pMappingFileData, LARGE_INTEGER FileSize, BYTE *PageData, CHAT_TYPE ChatType, const CHAR *szPasswordFilePath, int ThreadNum)
+BOOL CrackingDBFile(LPVOID pMappingFileData, LARGE_INTEGER FileSize, BYTE *PageData, CHAT_TYPE ChatType, const CHAR *szPasswordFilePath, int ThreadNum, BOOL blResume)
 {
 	CRACKING_ARGS *pCrackingArgs;
 	HANDLE *hThreads;
 	HANDLE hStopEvent;
 	int AlignSize;
 	DWORD dwThreadId;
-	CHAR szTaskDir[MAX_PATH] = { 0x00 };
+	CHAR szTaskDir[MAX_PATH] = {0x00};
 
 	AlignSize = FileSize.LowPart / ThreadNum;
 
@@ -156,6 +169,8 @@ BOOL CrackingDBFile(LPVOID pMappingFileData, LARGE_INTEGER FileSize, BYTE *PageD
 		pCrackingArgs[i].ThreadNum = ThreadNum;
 		pCrackingArgs[i].StartTime = GetTickCount64();
 		pCrackingArgs[i].TotalMappingFileDataSize = FileSize.QuadPart;
+		pCrackingArgs[i].ChatType = ChatType;
+		pCrackingArgs[i].blResume = blResume;
 		memcpy(pCrackingArgs[i].szPasswordFilePath, szPasswordFilePath, strlen(szPasswordFilePath));
 		memcpy(pCrackingArgs[i].szTaskDir, szTaskDir, strlen(szTaskDir));
 		switch (ChatType)

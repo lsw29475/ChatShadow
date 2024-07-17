@@ -13,3 +13,4 @@ typedef struct _CRACK_TASK
 } CRACK_TASK, *PCRACK_TASK;
 
 BOOL CreateNewCrackTask(CRACK_TASK* pCrackTask);
+BOOL ResumeCrackTask(const CHAR* szTaskDir);
