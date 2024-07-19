@@ -196,8 +196,8 @@ BOOL CrackingDBFile(LPVOID pMappingFileData, LARGE_INTEGER FileSize, BYTE *PageD
 		}
 	}
 
-	WaitForMultipleObjects(ThreadNum, hThreads, FALSE, INFINITE);
-	for (int i = 0; i < ThreadNum; i++)
+	WaitForMultipleObjects(ThreadNum, hThreads, TRUE, INFINITE); 
+	for (int i = 0; i < ThreadNum; i++) 
 	{
 		CloseHandle(hThreads[i]);
 	}
