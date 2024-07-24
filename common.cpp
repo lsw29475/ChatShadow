@@ -80,11 +80,16 @@ DWORD WINAPI CrackingThread(LPVOID lpParam)
 	SYSTEMTIME LocalTime;
 	int Pos = 0;
 
+	int CurUsedTime = 0;
+	int OldUsedTime = 0;
+	int NewUsedTime = 0;
+
 	if (pCrackingArgs->blResume)
 	{
 		CHAR szStatusFilePath[MAX_PATH] = {0x00};
 		sprintf_s(szStatusFilePath, "%s\\Status.txt", pCrackingArgs->szTaskDir);
 		Pos = GetLastPosFromStatusFile(szStatusFilePath, pCrackingArgs->ThreadId);
+		OldUsedTime = GetUsedTimeFromStatusFile(szStatusFilePath, pCrackingArgs->ThreadId);
 	}
 
 	for (; Pos < pCrackingArgs->MappingFileDataSize; Pos++)
@@ -118,10 +123,12 @@ DWORD WINAPI CrackingThread(LPVOID lpParam)
 		{
 			GetLocalTime(&LocalTime);
 			double progress = (double)Pos / pCrackingArgs->MappingFileDataSize * 100;
-			printf("%02d:%02d:%02d.%03d---Thread %d: pos: %llx/%llx  Progress %.2f%%  Time Elapsed: %llu s\n", LocalTime.wHour, LocalTime.wMinute, LocalTime.wSecond, LocalTime.wMilliseconds, pCrackingArgs->ThreadId,
+			CurUsedTime = (GetTickCount64() - pCrackingArgs->StartTime) / 1000;
+			NewUsedTime = OldUsedTime + CurUsedTime;
+			printf("%02d:%02d:%02d.%03d---Thread %d: pos: %llx/%llx  Progress %.2f%%  Time Elapsed: %llu s  Totally Used: %llu s\n", LocalTime.wHour, LocalTime.wMinute, LocalTime.wSecond, LocalTime.wMilliseconds, pCrackingArgs->ThreadId,
 				   Pos + (pCrackingArgs->ThreadId - 1) * pCrackingArgs->MappingFileDataSize, pCrackingArgs->TotalMappingFileDataSize, progress,
-				   (GetTickCount64() - pCrackingArgs->StartTime) / 1000);
-			SaveCrackingStatus(pCrackingArgs, Pos);
+				   CurUsedTime, NewUsedTime);
+			SaveCrackingStatus(pCrackingArgs, Pos, NewUsedTime);
 		}
 	}
 

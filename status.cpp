@@ -41,7 +41,7 @@ BOOL WriteStatusFile(const CHAR *szStatusFilePath, json JsonData)
     return true;
 }
 
-VOID SaveCrackingStatus(CRACKING_ARGS *pCrackingArgs, int Pos)
+VOID SaveCrackingStatus(CRACKING_ARGS *pCrackingArgs, int Pos, int UsedTime)
 {
     CHAR szStatusFilePath[MAX_PATH] = {0x00};
     json JsonData;
@@ -68,6 +68,8 @@ VOID SaveCrackingStatus(CRACKING_ARGS *pCrackingArgs, int Pos)
         JsonData["TaskType"] = std::to_string(pCrackingArgs->ChatType);
         std::string key = "Thread" + std::to_string(pCrackingArgs->ThreadId);
         JsonData[key] = std::to_string(Pos);
+        key = "Thread" + std::to_string(pCrackingArgs->ThreadId) + "UsedTime";
+        JsonData[key] = std::to_string(UsedTime);
         WriteStatusFile(szStatusFilePath, JsonData);
     }
     else
@@ -75,6 +77,8 @@ VOID SaveCrackingStatus(CRACKING_ARGS *pCrackingArgs, int Pos)
         ReadStatusFile(szStatusFilePath, JsonData);
         std::string key = "Thread" + std::to_string(pCrackingArgs->ThreadId);
         JsonData[key] = std::to_string(Pos);
+        key = "Thread" + std::to_string(pCrackingArgs->ThreadId) + "UsedTime";
+        JsonData[key] = std::to_string(UsedTime);
         WriteStatusFile(szStatusFilePath, JsonData);
     }
 
@@ -99,7 +103,7 @@ CHAT_TYPE GetChatTypeFromStatusFile(const CHAR *szStatusFilePath)
     }
 }
 
-int GetThreadNumFromStatusFile(const CHAR *szStatusFilePath)
+int GetIntValueFromStatusFile(const CHAR *szStatusFilePath, const CHAR *szKey)
 {
     json JsonData;
     if (!ReadStatusFile(szStatusFilePath, JsonData))
@@ -109,7 +113,7 @@ int GetThreadNumFromStatusFile(const CHAR *szStatusFilePath)
 
     try
     {
-        return std::stoi(JsonData["ThreadNum"].get<std::string>());
+        return std::stoi(JsonData[szKey].get<std::string>());
     }
     catch (const std::exception &e)
     {
@@ -128,6 +132,25 @@ int GetLastPosFromStatusFile(const CHAR *szStatusFilePath, int ThreadId)
     try
     {
         std::string key = "Thread" + std::to_string(ThreadId);
+        return std::stoi(JsonData[key].get<std::string>());
+    }
+    catch (const std::exception &e)
+    {
+        return -1;
+    }
+}
+
+int GetUsedTimeFromStatusFile(const CHAR *szStatusFilePath, int ThreadId)
+{
+    json JsonData;
+    if (!ReadStatusFile(szStatusFilePath, JsonData))
+    {
+        return -1;
+    }
+
+    try
+    {
+        std::string key = "Thread" + std::to_string(ThreadId) + "UsedTime";
         return std::stoi(JsonData[key].get<std::string>());
     }
     catch (const std::exception &e)

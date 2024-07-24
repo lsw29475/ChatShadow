@@ -10,13 +10,9 @@
 BOOL CreateNewCrackTask(CRACK_TASK *pTask)
 {
 	CHAR DestPathMem[MAX_PATH] = {0x00};
-	;
 	CHAR DestPathDB[MAX_PATH] = {0x00};
-	;
 	CHAR DecDBFilePath[MAX_PATH] = {0x00};
-	;
 	CHAR PasswordFilePath[MAX_PATH] = {0x00};
-	;
 
 	if (PathFileExistsA(pTask->szTaskDir))
 	{
@@ -89,9 +85,9 @@ BOOL ResumeCrackTask(const CHAR *szTaskDir)
 	switch (GetChatTypeFromStatusFile(szStatusFilePath))
 	{
 	case WECHAT:
-		CrackWeChatMsgDBFile(CrackTask.szMemoryFilePath, CrackTask.szMsgDBFilePath, DecDBFilePath, PasswordFilePath, GetThreadNumFromStatusFile(szStatusFilePath), TRUE);
+		CrackWeChatMsgDBFile(CrackTask.szMemoryFilePath, CrackTask.szMsgDBFilePath, DecDBFilePath, PasswordFilePath, GetIntValueFromStatusFile(szStatusFilePath, "ThreadNum"), TRUE);
 		break;
-	
+
 	default:
 		break;
 	}
