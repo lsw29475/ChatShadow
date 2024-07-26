@@ -6,16 +6,46 @@
 #include <openssl/aes.h>
 #include <openssl/hmac.h>
 
-BOOL CrackWeChatMsgDBPassword(const CHAR* szMemoryFilePath, const CHAR* szWeChatMsgDBFilePath, const CHAR* szPasswordFilePath, int ThreadNum, BOOL blResume)
+BOOL FilterWeChatPos(BYTE *Pos)
+{
+	int i = 0;
+
+	if (Pos[0] == Pos[1] && Pos[1] == Pos[2])
+	{
+		return FALSE;
+	}
+
+	for (int z = 0; z <= 0xFF; z++)
+	{
+		i = 0;
+
+		for (int j = 0; j < WECHAT_PASSWORD_SIZE; j++)
+		{
+			if (Pos[j] == z)
+			{
+				i++;
+			}
+
+			if (i > 2)
+			{
+				return FALSE;
+			}
+		}
+	}
+
+	return TRUE;
+}
+
+BOOL CrackWeChatMsgDBPassword(const CHAR *szMemoryFilePath, const CHAR *szWeChatMsgDBFilePath, const CHAR *szPasswordFilePath, int ThreadNum, BOOL blResume)
 {
 	HANDLE hDBFile = INVALID_HANDLE_VALUE;
-	BYTE PageData[WECHAT_PAGE_SIZE] = { 0x00 };
+	BYTE PageData[WECHAT_PAGE_SIZE] = {0x00};
 
 	HANDLE hMemFile = INVALID_HANDLE_VALUE;
 	HANDLE hMemMappingFile = INVALID_HANDLE_VALUE;
 	LPVOID pMappingFileData = NULL;
 	LARGE_INTEGER FileSize;
-	BYTE* pMemFileData = NULL;
+	BYTE *pMemFileData = NULL;
 
 	hDBFile = CreateFileA(szWeChatMsgDBFilePath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hDBFile == INVALID_HANDLE_VALUE)
@@ -38,7 +68,7 @@ BOOL CrackWeChatMsgDBPassword(const CHAR* szMemoryFilePath, const CHAR* szWeChat
 		printf("CreateFileA open %s fail, error: %d\n", szMemoryFilePath, GetLastError());
 		return FALSE;
 	}
-	FileSize.LowPart = GetFileSize(hMemFile, (DWORD*)&FileSize.HighPart);
+	FileSize.LowPart = GetFileSize(hMemFile, (DWORD *)&FileSize.HighPart);
 
 	hMemMappingFile = CreateFileMappingA(hMemFile, NULL, PAGE_READONLY, 0, 0, NULL);
 	if (hMemMappingFile == NULL)
@@ -60,10 +90,10 @@ BOOL CrackWeChatMsgDBPassword(const CHAR* szMemoryFilePath, const CHAR* szWeChat
 	return CrackingDBFile(pMappingFileData, FileSize, PageData, WECHAT, szPasswordFilePath, ThreadNum, blResume);
 }
 
-BOOL CrackWeChatMsgDBFile(const CHAR* szMemoryFilePath, const CHAR* szWeChatMsgDBFilePath, const CHAR* szDecWeChatMsgDBFilePath, const CHAR* szPasswordFilePath, int ThreadNum, BOOL blResume)
+BOOL CrackWeChatMsgDBFile(const CHAR *szMemoryFilePath, const CHAR *szWeChatMsgDBFilePath, const CHAR *szDecWeChatMsgDBFilePath, const CHAR *szPasswordFilePath, int ThreadNum, BOOL blResume)
 {
 	HANDLE hPasswordFile = INVALID_HANDLE_VALUE;
-	BYTE szPassword[WECHAT_PASSWORD_SIZE] = { 0x00 };
+	BYTE szPassword[WECHAT_PASSWORD_SIZE] = {0x00};
 
 	if (!CrackWeChatMsgDBPassword(szMemoryFilePath, szWeChatMsgDBFilePath, szPasswordFilePath, ThreadNum, blResume))
 	{
@@ -101,7 +131,6 @@ BOOL CheckingWeChatMsgDBPassword(BYTE *CheckingData, int CheckingDataLength, BYT
 	OSSL_PARAM params[2];
 	int i;
 
-	// ��ʼ���㷨
 	static int openssl_initialized = 0;
 	if (!openssl_initialized)
 	{
@@ -109,19 +138,13 @@ BOOL CheckingWeChatMsgDBPassword(BYTE *CheckingData, int CheckingDataLength, BYT
 		openssl_initialized = 1;
 	}
 
-	// ���ɽ�����Կ
 	PKCS5_PBKDF2_HMAC_SHA1((const char *)CheckingData, CheckingDataLength, DBData, WECHAT_SALT_SIZE, WECHAT_DEFAULT_ITER, sizeof(DecKey), DecKey);
-
-	// ����MacSalt
 	for (i = 0; i < WECHAT_SALT_SIZE; i++)
 	{
 		MacSalt[i] = DBData[i] ^ 0x3a;
 	}
-
-	// ����MAC��Կ
 	PKCS5_PBKDF2_HMAC_SHA1((const char *)DecKey, sizeof(DecKey), MacSalt, sizeof(MacSalt), 2, sizeof(MacKey), MacKey);
 
-	// ��ʼ��HMAC
 	hmac = EVP_MAC_fetch(NULL, "HMAC", NULL);
 	if (hmac == NULL)
 	{
@@ -135,7 +158,7 @@ BOOL CheckingWeChatMsgDBPassword(BYTE *CheckingData, int CheckingDataLength, BYT
 		return FALSE;
 	}
 
-	params[0] = OSSL_PARAM_construct_utf8_string("digest", (char*)"SHA1", 0);
+	params[0] = OSSL_PARAM_construct_utf8_string("digest", (char *)"SHA1", 0);
 	params[1] = OSSL_PARAM_construct_end();
 
 	if (EVP_MAC_init(ctx, MacKey, sizeof(MacKey), params) != 1)
@@ -145,7 +168,6 @@ BOOL CheckingWeChatMsgDBPassword(BYTE *CheckingData, int CheckingDataLength, BYT
 		return FALSE;
 	}
 
-	// ����HMAC
 	if (EVP_MAC_update(ctx, DBData + WECHAT_SALT_SIZE, WECHAT_PAGE_SIZE - WECHAT_PAGE_REVERSED - WECHAT_SALT_SIZE) != 1 ||
 		EVP_MAC_update(ctx, (const unsigned char *)&nPage, sizeof(nPage)) != 1 ||
 		EVP_MAC_final(ctx, HashKey, &HashLen, sizeof(HashKey)) != 1)
@@ -155,11 +177,9 @@ BOOL CheckingWeChatMsgDBPassword(BYTE *CheckingData, int CheckingDataLength, BYT
 		return FALSE;
 	}
 
-	// ����
 	EVP_MAC_CTX_free(ctx);
 	EVP_MAC_free(hmac);
 
-	// �Ƚϼ������HMAC�����ݿ��е�HMAC
 	return !memcmp(HashKey, DBData + WECHAT_PAGE_SIZE - WECHAT_PAGE_REVERSED, HashLen);
 }
 
