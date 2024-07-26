@@ -1,6 +1,7 @@
 #include "common.h"
 #include "status.h"
 #include "WeChat/WeChat.h"
+#include "QQ/QQ.h"
 
 #include <stdio.h>
 #include <time.h>
@@ -42,36 +43,6 @@ BOOL CheckSQLiteDBHeader(const char *szDBFilePath)
 	return TRUE;
 }
 
-BOOL FilterPos(BYTE *Pos)
-{
-	int i = 0;
-
-	if (Pos[0] == Pos[1] && Pos[1] == Pos[2])
-	{
-		return FALSE;
-	}
-
-	for (int z = 0; z <= 0xFF; z++)
-	{
-		i = 0;
-
-		for (int j = 0; j < 0x20; j++)
-		{
-			if (Pos[j] == z)
-			{
-				i++;
-			}
-
-			if (i > 2)
-			{
-				return FALSE;
-			}
-		}
-	}
-
-	return TRUE;
-}
-
 DWORD WINAPI CrackingThread(LPVOID lpParam)
 {
 	CRACKING_ARGS *pCrackingArgs = (CRACKING_ARGS *)lpParam;
@@ -94,7 +65,7 @@ DWORD WINAPI CrackingThread(LPVOID lpParam)
 
 	for (; Pos < pCrackingArgs->MappingFileDataSize; Pos++)
 	{
-		if (!FilterPos((BYTE *)pCrackingArgs->pMappingFileData + Pos))
+		if (!pCrackingArgs->FilterPosFunction((BYTE *)pCrackingArgs->pMappingFileData + Pos))
 		{
 			continue;
 		}
@@ -184,8 +155,16 @@ BOOL CrackingDBFile(LPVOID pMappingFileData, LARGE_INTEGER FileSize, BYTE *PageD
 		{
 		case WECHAT:
 			pCrackingArgs[i].CheckingFunction = CheckingWeChatMsgDBPassword;
+			pCrackingArgs[i].FilterPosFunction = FilterWeChatPos;
 			pCrackingArgs[i].PasswordSize = WECHAT_PASSWORD_SIZE;
 			pCrackingArgs[i].PageDataSize = WECHAT_PAGE_SIZE;
+			break;
+
+		case QQ:
+			pCrackingArgs[i].CheckingFunction = CheckingQQMsgDBPassword;
+			pCrackingArgs[i].FilterPosFunction = FilterQQPos;
+			pCrackingArgs[i].PasswordSize = QQ_PASSWORD_SIZE;
+			pCrackingArgs[i].PageDataSize = QQ_PAGE_SIZE;
 			break;
 
 		default:
@@ -203,8 +182,8 @@ BOOL CrackingDBFile(LPVOID pMappingFileData, LARGE_INTEGER FileSize, BYTE *PageD
 		}
 	}
 
-	WaitForMultipleObjects(ThreadNum, hThreads, TRUE, INFINITE); 
-	for (int i = 0; i < ThreadNum; i++) 
+	WaitForMultipleObjects(ThreadNum, hThreads, TRUE, INFINITE);
+	for (int i = 0; i < ThreadNum; i++)
 	{
 		CloseHandle(hThreads[i]);
 	}

@@ -5,7 +5,8 @@
 typedef enum _CHAT_TYPE
 {
 	OTHER,
-	WECHAT
+	WECHAT,
+	QQ
 } CHAT_TYPE,
 	*PCHAT_TYPE;
 
@@ -24,8 +25,9 @@ typedef struct _CRACKING_ARGS
 	// 爆破所需数据大小
 	int PageDataSize;
 	// 爆破函数
-	BOOL(*CheckingFunction)
-	(BYTE *, int, BYTE *, int);
+	BOOL(*CheckingFunction) (BYTE *, int, BYTE *, int);
+	// 密钥过滤函数
+	BOOL(*FilterPosFunction) (BYTE *);
 	// 线程终止事件
 	HANDLE hStopEvent;
 	// 线程ID
