@@ -251,3 +251,14 @@ BOOL DecryptWeChatMsgDBFile(BYTE *Password, const CHAR *szWeChatMsgDBFilePath, c
 	CloseHandle(hDBFile);
 	return TRUE;
 }
+
+VOID PrintAndSaveWeChatMsgDBPassword(BYTE *Pos, const CHAR *szPasswordFilePath)
+{
+	for (int i = 0; i < WECHAT_PASSWORD_SIZE; i++)
+	{
+		printf("%02X ", *(BYTE *)(Pos + i));
+	}
+	HANDLE hOutPut = CreateFileA(szPasswordFilePath, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	WriteFile(hOutPut, Pos, WECHAT_PASSWORD_SIZE, NULL, NULL);
+	CloseHandle(hOutPut);
+}

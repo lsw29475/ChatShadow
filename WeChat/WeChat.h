@@ -14,6 +14,8 @@
 #define WECHAT_PAGE_IV_SIZE 16
 // 密钥长度
 #define WECHAT_PASSWORD_SIZE 32
+// 校验密码长度
+#define WECHAT_CHECK_PASSWORD_SIZE 32
 
 // 爆破微信数据库文件密码并解密
 BOOL CrackWeChatMsgDBFile(const CHAR *szMemoryFilePath, const CHAR *szWeChatMsgDBFilePath, const CHAR *szDecWeChatMsgDBFilePath, const CHAR *szPasswordFilePath, int ThreadNum, BOOL blResume);
@@ -23,3 +25,5 @@ BOOL DecryptWeChatMsgDBFile(BYTE *Password, const CHAR *szWeChatMsgDBFilePath, c
 BOOL CheckingWeChatMsgDBPassword(BYTE *CheckingData, int CheckingDataLength, BYTE *DBData, int DBDataLength);
 // 过滤微信密钥检测函数
 BOOL FilterWeChatPos(BYTE *Pos);
+// 打印并保存密钥
+VOID PrintAndSaveWeChatMsgDBPassword(BYTE *Pos, const CHAR *szPasswordFilePath);
