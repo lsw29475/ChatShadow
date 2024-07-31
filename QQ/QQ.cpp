@@ -8,29 +8,17 @@
 
 BOOL FilterQQPos(BYTE *Pos)
 {
-    int i = 0;
+    int sum = 0;
 
-    if (Pos[0] == Pos[1] && Pos[1] == Pos[2])
+    for (int i = 0; i <= 63; i++)
     {
-        return FALSE;
+        sum += *(((int *)Pos) + i);
     }
 
-    for (int z = 0; z <= 0xFF; z++)
+    sum = *(((int *)Pos)) + *(((int *)Pos) + 63);
+    if (sum == 0)
     {
-        i = 0;
-
-        for (int j = 0; j < QQ_PASSWORD_SIZE; j++)
-        {
-            if (Pos[j] == z)
-            {
-                i++;
-            }
-
-            if (i > 2)
-            {
-                return FALSE;
-            }
-        }
+        return FALSE;
     }
 
     return TRUE;
@@ -59,7 +47,7 @@ VOID TeaCalc(int *v, int n, int const key[4])
     } while (--rounds);
 }
 
-BOOL CrackQQMsgDBFile(const CHAR *szMemoryFilePath, const CHAR *szQQMsgDBFilePath, const CHAR *szDecQQMsgDBFilePath, const CHAR *szPasswordFilePath, int ThreadNum, BOOL blResume)
+BOOL CrackQQMsgDBPassword(const CHAR *szMemoryFilePath, const CHAR *szQQMsgDBFilePath, const CHAR *szPasswordFilePath, int ThreadNum, BOOL blResume)
 {
     HANDLE hDBFile = INVALID_HANDLE_VALUE;
     BYTE PageData[QQ_PAGE_SIZE] = {0x00};
@@ -77,6 +65,7 @@ BOOL CrackQQMsgDBFile(const CHAR *szMemoryFilePath, const CHAR *szQQMsgDBFilePat
         return FALSE;
     }
 
+    SetFilePointer(hDBFile, 0x400, NULL, FILE_BEGIN);
     memset(PageData, 0x00, sizeof(PageData));
     if (!ReadFile(hDBFile, PageData, sizeof(PageData), NULL, NULL))
     {
@@ -126,4 +115,96 @@ BOOL CheckingQQMsgDBPassword(BYTE *CheckingData, int CheckingDataLength, BYTE *D
     memcpy(TeaData, DBData, DBDataLength);
     TeaCalc((int *)TeaData, 0xFFFFF800, (int *)TeaKey);
     return *((int *)TeaData) == 'iLQS';
+}
+
+BOOL CrackQQMsgDBFile(const CHAR *szMemoryFilePath, const CHAR *szQQMsgDBFilePath, const CHAR *szDecQQMsgDBFilePath, const CHAR *szPasswordFilePath, int ThreadNum, BOOL blResume)
+{
+    HANDLE hPasswordFile = INVALID_HANDLE_VALUE;
+    BYTE szPassword[QQ_PASSWORD_SIZE] = {0x00};
+
+    if (!CrackQQMsgDBPassword(szMemoryFilePath, szQQMsgDBFilePath, szPasswordFilePath, ThreadNum, blResume))
+    {
+        return FALSE;
+    }
+
+    hPasswordFile = CreateFileA(szPasswordFilePath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hPasswordFile == INVALID_HANDLE_VALUE)
+    {
+        printf("CreateFileA open password file %s fail, error: %d\n", szPasswordFilePath, GetLastError());
+        return FALSE;
+    }
+
+    ReadFile(hPasswordFile, szPassword, QQ_PASSWORD_SIZE, NULL, NULL);
+    CloseHandle(hPasswordFile);
+
+    if (!DecryptQQMsgDBFile(szPassword, szQQMsgDBFilePath, szDecQQMsgDBFilePath))
+    {
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+BOOL DecryptQQMsgDBFile(BYTE *Password, const CHAR *szQQMsgDBFilePath, const CHAR *szDecDBFilePath)
+{
+    HANDLE hDBFile = INVALID_HANDLE_VALUE;
+    HANDLE hDecDBFile = INVALID_HANDLE_VALUE;
+    BYTE PageData[QQ_PAGE_SIZE] = {0x00};
+    DWORD dwByteRead = 0;
+
+    hDBFile = CreateFileA(szQQMsgDBFilePath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hDBFile == INVALID_HANDLE_VALUE)
+    {
+        printf("CreateFileA open %s fail, error: %d\n", szQQMsgDBFilePath, GetLastError());
+        return FALSE;
+    }
+
+    SetFilePointer(hDBFile, 0x400, NULL, FILE_BEGIN);
+    memset(PageData, 0x00, sizeof(PageData));
+    if (!ReadFile(hDBFile, PageData, sizeof(PageData), NULL, NULL))
+    {
+        return FALSE;
+    }
+
+    hDecDBFile = CreateFileA(szDecDBFilePath, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hDecDBFile == INVALID_HANDLE_VALUE)
+    {
+        printf("CreateFileA open %s fail, error: %d\n", szDecDBFilePath, GetLastError());
+        CloseHandle(hDBFile);
+        return FALSE;
+    }
+
+    while (TRUE)
+    {
+        TeaCalc((int *)PageData, 0xFFFFF800, (const int *)Password);
+        WriteFile(hDecDBFile, PageData, sizeof(PageData), NULL, NULL);
+        if (!ReadFile(hDBFile, PageData, sizeof(PageData), &dwByteRead, NULL) || dwByteRead != QQ_PAGE_SIZE)
+        {
+            break;
+        }
+    }
+
+    CloseHandle(hDBFile);
+    CloseHandle(hDecDBFile);
+    return TRUE;
+}
+
+VOID PrintAndSaveQQMsgDBPassword(BYTE *Pos, const CHAR *szPasswordFilePath)
+{
+    BYTE TeaKey[0x10] = {0x00};
+
+    for (int i = 0; i < sizeof(TeaKey); i++)
+    {
+        *(TeaKey + i) = *(PBYTE)(Pos + i * 0x11 + (*(Pos + i * 0x11 + 0x10) & 0xF));
+    }
+
+    printf("password: ");
+    for (int i = 0; i < sizeof(TeaKey); i++)
+    {
+        printf("%02X ", TeaKey[i]);
+    }
+
+    HANDLE hOutPut = CreateFileA(szPasswordFilePath, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    WriteFile(hOutPut, TeaKey, sizeof(TeaKey), NULL, NULL);
+    CloseHandle(hOutPut);
 }
