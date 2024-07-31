@@ -25,9 +25,14 @@ typedef struct _CRACKING_ARGS
 	// 爆破所需数据大小
 	int PageDataSize;
 	// 爆破函数
-	BOOL(*CheckingFunction) (BYTE *, int, BYTE *, int);
+	BOOL (*CheckingFunction)
+	(BYTE *, int, BYTE *, int);
 	// 密钥过滤函数
-	BOOL(*FilterPosFunction) (BYTE *);
+	BOOL (*FilterPosFunction)
+	(BYTE *);
+	// 密钥打印保存函数
+	VOID (*PrintAndSavePasswordFunction)
+	(BYTE *, const CHAR *);
 	// 线程终止事件
 	HANDLE hStopEvent;
 	// 线程ID

@@ -1,6 +1,7 @@
 #include "task.h"
 #include "status.h"
 #include "WeChat/WeChat.h"
+#include "QQ/QQ.h"
 
 #include <stdio.h>
 #include <shlwapi.h>
@@ -45,6 +46,10 @@ BOOL CreateNewCrackTask(CRACK_TASK *pTask)
 	{
 	case WECHAT:
 		CrackWeChatMsgDBFile(pTask->szMemoryFilePath, pTask->szMsgDBFilePath, DecDBFilePath, PasswordFilePath, pTask->ThreadNum, FALSE);
+		break;
+
+	case QQ:
+		CrackQQMsgDBFile(pTask->szMemoryFilePath, pTask->szMsgDBFilePath, DecDBFilePath, PasswordFilePath, pTask->ThreadNum, FALSE);
 		break;
 
 	default:

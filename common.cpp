@@ -46,7 +46,7 @@ BOOL CheckSQLiteDBHeader(const char *szDBFilePath)
 DWORD WINAPI CrackingThread(LPVOID lpParam)
 {
 	CRACKING_ARGS *pCrackingArgs = (CRACKING_ARGS *)lpParam;
-	int progressInterval = 1000;
+	int progressInterval = 10000;
 	int counter = 0;
 	SYSTEMTIME LocalTime;
 	int Pos = 0;
@@ -78,14 +78,7 @@ DWORD WINAPI CrackingThread(LPVOID lpParam)
 		if (pCrackingArgs->CheckingFunction((BYTE *)pCrackingArgs->pMappingFileData + Pos, pCrackingArgs->PasswordSize, (BYTE *)pCrackingArgs->PageData, pCrackingArgs->PageDataSize))
 		{
 			printf("Thread %d: Find password, pos: %llx\n", pCrackingArgs->ThreadId, Pos + (pCrackingArgs->ThreadId - 1) * pCrackingArgs->MappingFileDataSize);
-			printf("password: ");
-			for (int j = 0; j < pCrackingArgs->PasswordSize; j++)
-			{
-				printf("%02X ", *(BYTE *)((BYTE *)pCrackingArgs->pMappingFileData + Pos + j));
-			}
-			HANDLE hOutPut = CreateFileA(pCrackingArgs->szPasswordFilePath, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-			WriteFile(hOutPut, (BYTE *)pCrackingArgs->pMappingFileData + Pos, pCrackingArgs->PasswordSize, NULL, NULL);
-			CloseHandle(hOutPut);
+			pCrackingArgs->PrintAndSavePasswordFunction((BYTE *)pCrackingArgs->pMappingFileData + Pos, pCrackingArgs->szPasswordFilePath);
 			SetEvent(pCrackingArgs->hStopEvent);
 			return 1;
 		}
@@ -156,14 +149,16 @@ BOOL CrackingDBFile(LPVOID pMappingFileData, LARGE_INTEGER FileSize, BYTE *PageD
 		case WECHAT:
 			pCrackingArgs[i].CheckingFunction = CheckingWeChatMsgDBPassword;
 			pCrackingArgs[i].FilterPosFunction = FilterWeChatPos;
-			pCrackingArgs[i].PasswordSize = WECHAT_PASSWORD_SIZE;
+			pCrackingArgs[i].PrintAndSavePasswordFunction = PrintAndSaveWeChatMsgDBPassword;
+			pCrackingArgs[i].PasswordSize = WECHAT_CHECK_PASSWORD_SIZE;
 			pCrackingArgs[i].PageDataSize = WECHAT_PAGE_SIZE;
 			break;
 
 		case QQ:
 			pCrackingArgs[i].CheckingFunction = CheckingQQMsgDBPassword;
 			pCrackingArgs[i].FilterPosFunction = FilterQQPos;
-			pCrackingArgs[i].PasswordSize = QQ_PASSWORD_SIZE;
+			pCrackingArgs[i].PrintAndSavePasswordFunction = PrintAndSaveQQMsgDBPassword;
+			pCrackingArgs[i].PasswordSize = QQ_CHECK_PASSWORD_SIZE;
 			pCrackingArgs[i].PageDataSize = QQ_PAGE_SIZE;
 			break;
 
