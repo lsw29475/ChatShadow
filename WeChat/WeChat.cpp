@@ -54,8 +54,8 @@ BOOL CrackWeChatMsgDBPassword(const CHAR *szMemoryFilePath, const CHAR *szWeChat
 		return FALSE;
 	}
 
-	memset(PageData, 0x00, sizeof(PageData));
-	if (!ReadFile(hDBFile, PageData, sizeof(PageData), NULL, NULL))
+	memset(PageData, 0x00, WECHAT_PAGE_SIZE);
+	if (!ReadFile(hDBFile, PageData, WECHAT_PAGE_SIZE, NULL, NULL))
 	{
 		CloseHandle(hDBFile);
 		return FALSE;
@@ -196,8 +196,8 @@ BOOL DecryptWeChatMsgDBFile(BYTE *Password, const CHAR *szWeChatMsgDBFilePath, c
 		return FALSE;
 	}
 
-	memset(PageData, 0x00, sizeof(PageData));
-	if (!ReadFile(hDBFile, PageData, sizeof(PageData), NULL, NULL))
+	memset(PageData, 0x00, WECHAT_PAGE_SIZE);
+	if (!ReadFile(hDBFile, PageData, WECHAT_PAGE_SIZE, NULL, NULL))
 	{
 		return FALSE;
 	}
@@ -236,12 +236,12 @@ BOOL DecryptWeChatMsgDBFile(BYTE *Password, const CHAR *szWeChatMsgDBFilePath, c
 		EVP_CipherFinal_ex(CipherCtx, DecPageData + FixOffset + DecryptLen, &DecryptLen);
 		EVP_CIPHER_CTX_free(CipherCtx);
 
-		WriteFile(hDecDBFile, DecPageData, sizeof(DecPageData), NULL, NULL);
+		WriteFile(hDecDBFile, DecPageData, WECHAT_PAGE_SIZE, NULL, NULL);
 
 		PageCount++;
 		FixOffset = 0;
 
-		if (!ReadFile(hDBFile, PageData, sizeof(PageData), &dwByteRead, NULL) || dwByteRead != WECHAT_PAGE_SIZE)
+		if (!ReadFile(hDBFile, PageData, WECHAT_PAGE_SIZE, &dwByteRead, NULL) || dwByteRead != WECHAT_PAGE_SIZE)
 		{
 			break;
 		}
