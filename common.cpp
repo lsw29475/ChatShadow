@@ -46,7 +46,7 @@ BOOL CheckSQLiteDBHeader(const char *szDBFilePath)
 DWORD WINAPI CrackingThread(LPVOID lpParam)
 {
 	CRACKING_ARGS *pCrackingArgs = (CRACKING_ARGS *)lpParam;
-	int progressInterval = 10000;
+	int progressInterval = 1000;
 	int counter = 0;
 	SYSTEMTIME LocalTime;
 	int Pos = 0;
