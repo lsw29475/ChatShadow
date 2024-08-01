@@ -66,8 +66,8 @@ BOOL CrackQQMsgDBPassword(const CHAR *szMemoryFilePath, const CHAR *szQQMsgDBFil
     }
 
     SetFilePointer(hDBFile, 0x400, NULL, FILE_BEGIN);
-    memset(PageData, 0x00, sizeof(PageData));
-    if (!ReadFile(hDBFile, PageData, sizeof(PageData), NULL, NULL))
+    memset(PageData, 0x00, QQ_PAGE_SIZE);
+    if (!ReadFile(hDBFile, PageData, QQ_PAGE_SIZE, NULL, NULL))
     {
         CloseHandle(hDBFile);
         return FALSE;
@@ -107,7 +107,7 @@ BOOL CheckingQQMsgDBPassword(BYTE *CheckingData, int CheckingDataLength, BYTE *D
     BYTE TeaKey[0x10] = {0x00};
     BYTE TeaData[QQ_PAGE_SIZE] = {0x00};
 
-    for (int i = 0; i < sizeof(TeaKey); i++)
+    for (int i = 0; i < QQ_PASSWORD_SIZE; i++)
     {
         *(TeaKey + i) = *(PBYTE)(CheckingData + i * 0x11 + (*(CheckingData + i * 0x11 + 0x10) & 0xF));
     }
@@ -160,8 +160,8 @@ BOOL DecryptQQMsgDBFile(BYTE *Password, const CHAR *szQQMsgDBFilePath, const CHA
     }
 
     SetFilePointer(hDBFile, 0x400, NULL, FILE_BEGIN);
-    memset(PageData, 0x00, sizeof(PageData));
-    if (!ReadFile(hDBFile, PageData, sizeof(PageData), NULL, NULL))
+    memset(PageData, 0x00, QQ_PAGE_SIZE);
+    if (!ReadFile(hDBFile, PageData, QQ_PAGE_SIZE, NULL, NULL))
     {
         return FALSE;
     }
@@ -177,8 +177,8 @@ BOOL DecryptQQMsgDBFile(BYTE *Password, const CHAR *szQQMsgDBFilePath, const CHA
     while (TRUE)
     {
         TeaCalc((int *)PageData, 0xFFFFF800, (const int *)Password);
-        WriteFile(hDecDBFile, PageData, sizeof(PageData), NULL, NULL);
-        if (!ReadFile(hDBFile, PageData, sizeof(PageData), &dwByteRead, NULL) || dwByteRead != QQ_PAGE_SIZE)
+        WriteFile(hDecDBFile, PageData, QQ_PAGE_SIZE, NULL, NULL);
+        if (!ReadFile(hDBFile, PageData, QQ_PAGE_SIZE, &dwByteRead, NULL) || dwByteRead != QQ_PAGE_SIZE)
         {
             break;
         }
@@ -193,18 +193,18 @@ VOID PrintAndSaveQQMsgDBPassword(BYTE *Pos, const CHAR *szPasswordFilePath)
 {
     BYTE TeaKey[0x10] = {0x00};
 
-    for (int i = 0; i < sizeof(TeaKey); i++)
+    for (int i = 0; i < QQ_PASSWORD_SIZE; i++)
     {
         *(TeaKey + i) = *(PBYTE)(Pos + i * 0x11 + (*(Pos + i * 0x11 + 0x10) & 0xF));
     }
 
     printf("password: ");
-    for (int i = 0; i < sizeof(TeaKey); i++)
+    for (int i = 0; i < QQ_PASSWORD_SIZE; i++)
     {
         printf("%02X ", TeaKey[i]);
     }
 
     HANDLE hOutPut = CreateFileA(szPasswordFilePath, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-    WriteFile(hOutPut, TeaKey, sizeof(TeaKey), NULL, NULL);
+    WriteFile(hOutPut, TeaKey, QQ_PASSWORD_SIZE, NULL, NULL);
     CloseHandle(hOutPut);
 }
