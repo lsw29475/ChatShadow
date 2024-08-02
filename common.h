@@ -49,6 +49,8 @@ typedef struct _CRACKING_ARGS
 	CHAR szTaskDir[MAX_PATH];
 	// 爆破软件类型
 	CHAT_TYPE ChatType;
+	// 日志打印间隔
+	int ProgressInterval;
 	// 是否从旧任务恢复
 	BOOL blResume;
 } CRACKING_ARGS, *PCRACKING_ARGS;

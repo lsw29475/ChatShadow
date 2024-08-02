@@ -46,7 +46,6 @@ BOOL CheckSQLiteDBHeader(const char *szDBFilePath)
 DWORD WINAPI CrackingThread(LPVOID lpParam)
 {
 	CRACKING_ARGS *pCrackingArgs = (CRACKING_ARGS *)lpParam;
-	int progressInterval = 1000;
 	int counter = 0;
 	SYSTEMTIME LocalTime;
 	int Pos = 0;
@@ -83,7 +82,7 @@ DWORD WINAPI CrackingThread(LPVOID lpParam)
 			return 1;
 		}
 
-		if (counter++ % progressInterval == 0)
+		if (counter++ % pCrackingArgs->ProgressInterval == 0)
 		{
 			GetLocalTime(&LocalTime);
 			double progress = (double)Pos / pCrackingArgs->MappingFileDataSize * 100;
@@ -152,6 +151,7 @@ BOOL CrackingDBFile(LPVOID pMappingFileData, LARGE_INTEGER FileSize, BYTE *PageD
 			pCrackingArgs[i].PrintAndSavePasswordFunction = PrintAndSaveWeChatMsgDBPassword;
 			pCrackingArgs[i].PasswordSize = WECHAT_CHECK_PASSWORD_SIZE;
 			pCrackingArgs[i].PageDataSize = WECHAT_PAGE_SIZE;
+			pCrackingArgs[i].ProgressInterval = WECHAT_PROGRESS_INTERVAL;
 			break;
 
 		case QQ:
@@ -160,6 +160,7 @@ BOOL CrackingDBFile(LPVOID pMappingFileData, LARGE_INTEGER FileSize, BYTE *PageD
 			pCrackingArgs[i].PrintAndSavePasswordFunction = PrintAndSaveQQMsgDBPassword;
 			pCrackingArgs[i].PasswordSize = QQ_CHECK_PASSWORD_SIZE;
 			pCrackingArgs[i].PageDataSize = QQ_PAGE_SIZE;
+			pCrackingArgs[i].ProgressInterval = QQ_PROGRESS_INTERVAL;
 			break;
 
 		default:
