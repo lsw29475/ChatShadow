@@ -16,6 +16,8 @@
 #define WECHAT_PASSWORD_SIZE 32
 // 校验密码长度
 #define WECHAT_CHECK_PASSWORD_SIZE 32
+// 打印输出间隔
+#define WECHAT_PROGRESS_INTERVAL 1000
 
 // 爆破微信数据库文件密码并解密
 BOOL CrackWeChatMsgDBFile(const CHAR *szMemoryFilePath, const CHAR *szWeChatMsgDBFilePath, const CHAR *szDecWeChatMsgDBFilePath, const CHAR *szPasswordFilePath, int ThreadNum, BOOL blResume);
