@@ -3,6 +3,7 @@
 #include "module.h"
 
 #include "modules/wechat.h"
+#include "modules/wechat_v4.h"
 #include "modules/qq_old.h"
 #include "modules/qq_nt.h"
 
@@ -18,6 +19,7 @@ static bool run_crack(const char* mem_path, const char* db_path, const char* tas
 // All registered modules
 static const ChatModule* g_modules[] = {
     &wechat_module,
+    &wechat_v4_module,
     &qq_old_module,
     &qq_nt_module,
 };
