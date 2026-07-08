@@ -5,7 +5,6 @@
 #include "modules/wechat.h"
 #include "modules/wechat_v4.h"
 #include "modules/wechat_v4_bin.h"
-#include "modules/wechat_v4_hex.h"
 #include "modules/qq_old.h"
 #include "modules/qq_nt.h"
 
@@ -23,7 +22,6 @@ static const ChatModule* g_modules[] = {
     &wechat_module,
     &wechat_v4_module,
     &wechat_v4_bin_module,
-    &wechat_v4_hex_module,
     &qq_old_module,
     &qq_nt_module,
 };
