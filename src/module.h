@@ -42,6 +42,15 @@ typedef struct ChatModule {
 
     // Optional: cleanup after scanning.
     void (*cleanup)(void);
+
+    // Optional: YARA-style scan to find candidate positions in the dump.
+    // Returns number of candidates; fills key_buf with up to max_keys keys.
+    // Each key is key_size bytes.
+    // dump: full memory dump; dump_size: size in bytes.
+    // key_buf: output buffer (max_keys * key_size bytes).
+    // max_keys: maximum number of keys to extract.
+    int (*scan_candidates)(const uint8_t* dump, int64_t dump_size,
+                           uint8_t* key_buf, int max_keys);
 } ChatModule;
 
 #ifdef __cplusplus

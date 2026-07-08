@@ -166,6 +166,7 @@ const ChatModule wechat_v4_module = {
     wechat_v4_verify,
     wechat_v4_decrypt,
     wechat_v4_print_key,
-    nullptr,
-    nullptr
+    nullptr,   // init
+    nullptr,   // cleanup
+    nullptr    // scan_candidates
 };

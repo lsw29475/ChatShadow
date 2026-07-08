@@ -189,5 +189,6 @@ const ChatModule qq_nt_module = {
     qq_nt_decrypt,
     qq_nt_print_key,
     qq_nt_init,
-    qq_nt_cleanup
+    qq_nt_cleanup,
+    nullptr,
 };

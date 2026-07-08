@@ -109,5 +109,6 @@ const ChatModule qq_old_module = {
     qq_old_decrypt,
     qq_old_print_key,
     nullptr,  // init
-    nullptr   // cleanup
+    nullptr,  // cleanup
+    nullptr,
 };

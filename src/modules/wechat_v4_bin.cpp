@@ -32,18 +32,26 @@
 #define WX4B_HMAC_SALT_MASK  0x3a
 #define WX4B_PROGRESS_INTERVAL 2000
 
-// Filter: 32 bytes with reasonable entropy
+// Filter — matches wechat-decrypt key_v4.py is_potential_key()
+// At least 15 unique bytes, at most 24 printable (32-126) chars
 static bool wechat_v4_bin_filter(const uint8_t* data) {
-    int unique = 0;
     uint8_t freq[256] = {0};
-    int max_freq = 0;
+    int unique = 0, printable = 0, zeros = 0;
+
     for (int i = 0; i < WX4B_KEY_SIZE; i++) {
-        int f = ++freq[data[i]];
-        if (f > max_freq) max_freq = f;
-        if (f == 1) unique++;
+        uint8_t c = data[i];
+        if (c == 0) zeros++;
+        if (freq[c] == 0) unique++;
+        freq[c]++;
+        if (c >= 32 && c <= 126) printable++;
     }
-    if (max_freq > 28) return false;
-    if (unique < 8) return false;
+
+    // Not mostly zeros
+    if (zeros > 28) return false;
+    // At least 15 unique bytes (random crypto key)
+    if (unique < 15) return false;
+    // At most 24 printable chars (crypto keys are mostly non-printable)
+    if (printable > 24) return false;
     return true;
 }
 
@@ -145,6 +153,49 @@ static void wechat_v4_bin_print_key(const uint8_t* key) {
     for (int i = 0; i < WX4B_KEY_SIZE; i++) printf("%02X", key[i]);
 }
 
+// YARA-style scan: find pointer structures, scan nearby for crypto keys
+// Pattern: ?? ?? ?? ?? ?? ?? 00*10 20 00*7 2f 00*7
+// The key is typically within a few MB of the YARA structure
+static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
+                                          uint8_t* key_buf, int max_keys) {
+    const uint8_t needle[] = {
+        0,0,0,0,0,0,0,0,0,0, 0x20, 0,0,0,0,0,0,0, 0x2f, 0,0,0,0,0,0,0
+    };
+    const int needle_len = sizeof(needle);
+
+    int found = 0;
+    for (int64_t pos = 0; pos < dump_size - needle_len - 8 && found < max_keys; pos++) {
+        if (memcmp(dump + pos, needle, needle_len) != 0) continue;
+        if (pos < 6) continue;
+
+        // Scan a 64KB window around the match for 32-byte crypto keys
+        int64_t start = pos - 6 - 32*1024;
+        int64_t end   = pos + 32*1024;
+        if (start < 0) start = 0;
+        if (end > dump_size - WX4B_KEY_SIZE) end = dump_size - WX4B_KEY_SIZE;
+
+        for (int64_t k = start; k <= end && found < max_keys; k += 1) {
+            const uint8_t* c = dump + k;
+            int unique = 0, printable = 0, zeros = 0;
+            uint8_t freq[256] = {0};
+            for (int i = 0; i < WX4B_KEY_SIZE; i++) {
+                uint8_t b = c[i];
+                if (b == 0) zeros++;
+                if (freq[b] == 0) unique++;
+                freq[b]++;
+                if (b >= 32 && b <= 126) printable++;
+            }
+            // Reject zero-heavy and text-heavy: crypto keys have balanced distribution
+            if (unique < 20 || printable > 20 || zeros > 8) continue;
+
+            memcpy(key_buf + found * WX4B_KEY_SIZE, c, WX4B_KEY_SIZE);
+            found++;
+        }
+        pos += needle_len;
+    }
+    return found;
+}
+
 const ChatModule wechat_v4_bin_module = {
     "wechat_v4_bin",
     "WeChat 4.x (bin)",
@@ -158,5 +209,6 @@ const ChatModule wechat_v4_bin_module = {
     wechat_v4_bin_decrypt,
     wechat_v4_bin_print_key,
     nullptr,
-    nullptr
+    nullptr,
+    wechat_v4_bin_scan_candidates
 };

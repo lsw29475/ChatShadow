@@ -4,6 +4,8 @@
 
 #include "modules/wechat.h"
 #include "modules/wechat_v4.h"
+#include "modules/wechat_v4_bin.h"
+#include "modules/wechat_v4_hex.h"
 #include "modules/qq_old.h"
 #include "modules/qq_nt.h"
 
@@ -20,6 +22,8 @@ static bool run_crack(const char* mem_path, const char* db_path, const char* tas
 static const ChatModule* g_modules[] = {
     &wechat_module,
     &wechat_v4_module,
+    &wechat_v4_bin_module,
+    &wechat_v4_hex_module,
     &qq_old_module,
     &qq_nt_module,
 };
@@ -204,23 +208,49 @@ bool run_crack(const char* mem_path, const char* db_path, const char* task_dir,
         module->init(db_path);
     }
 
-    // Configure and run scan
+    // YARA-style pre-scan: if module supports it, find candidates via pattern matching
+    ScanResult result;
+    memset(&result, 0, sizeof(result));
     std::string password_path = path_join(task_dir, "Password");
     std::string dec_db_path = path_join(task_dir, "DecDB.db");
 
-    ScanConfig config;
-    memset(&config, 0, sizeof(config));
-    config.dump_data = dump_data;
-    config.dump_size = dump_size;
-    config.thread_count = thread_count;
-    config.module = module;
-    config.page_data = page_data;
-    config.page_size = module->page_size;
-    config.password_path = password_path.c_str();
-    config.task_dir = task_dir;
-    config.resume = resume;
+    if (module->scan_candidates) {
+        const int max_candidates = 1024;
+        uint8_t* key_buf = (uint8_t*)malloc(max_candidates * module->key_size);
+        int n = module->scan_candidates(dump_data, dump_size, key_buf, max_candidates);
+        printf("YARA pre-scan: %d candidates found\n", n);
 
-    ScanResult result = run_scan(config, progress_cb);
+        for (int i = 0; i < n; i++) {
+            uint8_t* key = key_buf + i * module->key_size;
+            if (module->verify(key, page_data, module->page_size)) {
+                printf("\n  KEY FOUND via YARA scan (candidate %d/%d)\n", i+1, n);
+                printf("  Key: ");
+                module->print_key(key);
+                printf("\n");
+                result.found = true;
+                memcpy(result.key, key, module->key_size);
+                break;
+            }
+        }
+        free(key_buf);
+    }
+
+    if (!result.found) {
+        // Configure and run byte-by-byte scan
+        ScanConfig config;
+        memset(&config, 0, sizeof(config));
+        config.dump_data = dump_data;
+        config.dump_size = dump_size;
+        config.thread_count = thread_count;
+        config.module = module;
+        config.page_data = page_data;
+        config.page_size = module->page_size;
+        config.password_path = password_path.c_str();
+        config.task_dir = task_dir;
+        config.resume = resume;
+
+        result = run_scan(config, progress_cb);
+    }
 
     free(dump_data);
     free(page_data);

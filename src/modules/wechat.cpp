@@ -147,5 +147,6 @@ const ChatModule wechat_module = {
     wechat_decrypt,
     wechat_print_key,
     nullptr,  // init
-    nullptr   // cleanup
+    nullptr,  // cleanup
+    nullptr,
 };
