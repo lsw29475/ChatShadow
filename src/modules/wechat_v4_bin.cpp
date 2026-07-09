@@ -158,36 +158,31 @@ static const uint8_t WX4B_INTERNAL_KEY[32] = {
     0xfa,0x79,0xf6,0x2c,0x6e,0x2e,0x7c,0xe7
 };
 
-// Scan: search for known marker string, extract XOR data at fixed offset
-// The string "g_voice_input_show_note_placeholder_text_count" is near
-// the persistent XOR data in WeChat's memory at a consistent offset (+896).
+// Scan: find marker string, scan ±1MB window, XOR with internal_key
+// Even if offset varies between versions, 1MB window covers it safely.
+// Each candidate costs only a simple filter, then PBKDF2 verify in main loop.
 static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
                                           uint8_t* key_buf, int max_keys) {
     const char marker[] = "g_voice_input_show_note_placeholder_text_count";
     const int marker_len = sizeof(marker) - 1;
-    const int xor_offset = -576; // XOR data is 576 bytes BEFORE the marker
+    const int window = 4 * 1024;  // ±4KB around marker
 
     int found = 0;
-    for (int64_t pos = -xor_offset; pos < dump_size - marker_len && found < max_keys; pos++) {
+    for (int64_t pos = 0; pos < dump_size - marker_len && found < max_keys; pos++) {
         if (memcmp(dump + pos, marker, marker_len) != 0) continue;
 
-        const uint8_t* xd = dump + pos + xor_offset;
-        uint8_t xored[WX4B_KEY_SIZE];
-        for (int i = 0; i < WX4B_KEY_SIZE; i++)
-            xored[i] = xd[i] ^ WX4B_INTERNAL_KEY[i];
+        int64_t start = pos - window;
+        int64_t end   = pos + window;
+        if (start < 0) start = 0;
+        if (end > dump_size - WX4B_KEY_SIZE) end = dump_size - WX4B_KEY_SIZE;
 
-        // Quick filter on result
-        int unique = 0;
-        for (int i = 0; i < WX4B_KEY_SIZE; i++) {
-            uint8_t b = xored[i];
-            if (b == 0) { unique = 0; break; } // reject zeros
-            if (b < 32 || b > 126) unique |= 1; // has non-printable
-            else unique |= 2; // has printable
+        // XOR every 32-byte block in window, no filter — let verify handle it
+        for (int64_t k = start; k <= end && found < max_keys; k += 1) {
+            const uint8_t* c = dump + k;
+            for (int i = 0; i < WX4B_KEY_SIZE; i++)
+                key_buf[found * WX4B_KEY_SIZE + i] = c[i] ^ WX4B_INTERNAL_KEY[i];
+            found++;
         }
-        if (unique != 3) { pos += marker_len; continue; } // need both types, no zeros
-
-        memcpy(key_buf + found * WX4B_KEY_SIZE, xored, WX4B_KEY_SIZE);
-        found++;
         pos += marker_len;
     }
     return found;
