@@ -176,14 +176,13 @@ static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
         if (start < 0) start = 0;
         if (end > dump_size - WX4B_KEY_SIZE) end = dump_size - WX4B_KEY_SIZE;
 
-        // XOR every 32-byte block in window, no filter — let verify handle it
         for (int64_t k = start; k <= end && found < max_keys; k += 1) {
             const uint8_t* c = dump + k;
             for (int i = 0; i < WX4B_KEY_SIZE; i++)
                 key_buf[found * WX4B_KEY_SIZE + i] = c[i] ^ WX4B_INTERNAL_KEY[i];
             found++;
         }
-        pos += marker_len;
+        break;  // only first marker hit — avoid flooding buffer
     }
     return found;
 }
