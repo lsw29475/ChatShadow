@@ -10,22 +10,19 @@
 #include <openssl/hmac.h>
 #include <openssl/sha.h>
 
-// WeChat 4.x binary key — 32-byte passphrase in process memory
-// Algorithm from WeChatDataAnalysis key_v4.py is_ok():
-//
-//   derived_key = PBKDF2-SHA512(key, db_salt, 256000, 32)
+// WeChat 4.x binary key
+// Algorithm reverse-engineered from Weixin.dll:
+//   internal_key (32B, hardcoded in DLL) XOR mem_data (32B) → passphrase
+//   derived_key = PBKDF2-SHA512(passphrase, db_salt, 256000, 32)
 //   hmac_key    = PBKDF2-SHA512(derived_key, db_salt^0x3A, 2, 32)
 //   HMAC-SHA512(hmac_key, page[16:4032] + LE32(1)) == page[4032:4096]
-//
-// Decrypt: raw_key = x'<derived_key_hex><db_salt_hex>'
-//   sqlcipher PRAGMA key = raw_key (raw key mode, no further PBKDF2)
 
 #define WX4B_PAGE_SIZE       4096
 #define WX4B_KEY_SIZE        32
 #define WX4B_PROBE_SIZE      32
 #define WX4B_SALT_SIZE       16
 #define WX4B_IV_SIZE         16
-#define WX4B_HMAC_SIZE       64   // HMAC-SHA512
+#define WX4B_HMAC_SIZE       64
 #define WX4B_RESERVE_SZ      80
 #define WX4B_KDF_ITER        256000
 #define WX4B_FAST_ITER       2
@@ -153,45 +150,45 @@ static void wechat_v4_bin_print_key(const uint8_t* key) {
     for (int i = 0; i < WX4B_KEY_SIZE; i++) printf("%02X", key[i]);
 }
 
-// YARA-style scan: find pointer structures, scan nearby for crypto keys
-// Pattern: ?? ?? ?? ?? ?? ?? 00*10 20 00*7 2f 00*7
-// The key is typically within a few MB of the YARA structure
+// Hardcoded 32-byte internal key extracted from Weixin.dll at VA 0x18033C887
+static const uint8_t WX4B_INTERNAL_KEY[32] = {
+    0xe5,0x3b,0x45,0xdd,0xbb,0x81,0x62,0xe1,
+    0xd1,0x39,0x4a,0x4c,0x61,0x9a,0xd0,0xae,
+    0x27,0xf0,0x20,0x7f,0xec,0x4b,0x35,0xa8,
+    0xfa,0x79,0xf6,0x2c,0x6e,0x2e,0x7c,0xe7
+};
+
+// Scan: search for known marker string, extract XOR data at fixed offset
+// The string "g_voice_input_show_note_placeholder_text_count" is near
+// the persistent XOR data in WeChat's memory at a consistent offset (+896).
 static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
                                           uint8_t* key_buf, int max_keys) {
-    const uint8_t needle[] = {
-        0,0,0,0,0,0,0,0,0,0, 0x20, 0,0,0,0,0,0,0, 0x2f, 0,0,0,0,0,0,0
-    };
-    const int needle_len = sizeof(needle);
+    const char marker[] = "g_voice_input_show_note_placeholder_text_count";
+    const int marker_len = sizeof(marker) - 1;
+    const int xor_offset = -576; // XOR data is 576 bytes BEFORE the marker
 
     int found = 0;
-    for (int64_t pos = 0; pos < dump_size - needle_len - 8 && found < max_keys; pos++) {
-        if (memcmp(dump + pos, needle, needle_len) != 0) continue;
-        if (pos < 6) continue;
+    for (int64_t pos = -xor_offset; pos < dump_size - marker_len && found < max_keys; pos++) {
+        if (memcmp(dump + pos, marker, marker_len) != 0) continue;
 
-        // Scan a 64KB window around the match for 32-byte crypto keys
-        int64_t start = pos - 6 - 32*1024;
-        int64_t end   = pos + 32*1024;
-        if (start < 0) start = 0;
-        if (end > dump_size - WX4B_KEY_SIZE) end = dump_size - WX4B_KEY_SIZE;
+        const uint8_t* xd = dump + pos + xor_offset;
+        uint8_t xored[WX4B_KEY_SIZE];
+        for (int i = 0; i < WX4B_KEY_SIZE; i++)
+            xored[i] = xd[i] ^ WX4B_INTERNAL_KEY[i];
 
-        for (int64_t k = start; k <= end && found < max_keys; k += 1) {
-            const uint8_t* c = dump + k;
-            int unique = 0, printable = 0, zeros = 0;
-            uint8_t freq[256] = {0};
-            for (int i = 0; i < WX4B_KEY_SIZE; i++) {
-                uint8_t b = c[i];
-                if (b == 0) zeros++;
-                if (freq[b] == 0) unique++;
-                freq[b]++;
-                if (b >= 32 && b <= 126) printable++;
-            }
-            // Reject zero-heavy and text-heavy: crypto keys have balanced distribution
-            if (unique < 20 || printable > 20 || zeros > 8) continue;
-
-            memcpy(key_buf + found * WX4B_KEY_SIZE, c, WX4B_KEY_SIZE);
-            found++;
+        // Quick filter on result
+        int unique = 0;
+        for (int i = 0; i < WX4B_KEY_SIZE; i++) {
+            uint8_t b = xored[i];
+            if (b == 0) { unique = 0; break; } // reject zeros
+            if (b < 32 || b > 126) unique |= 1; // has non-printable
+            else unique |= 2; // has printable
         }
-        pos += needle_len;
+        if (unique != 3) { pos += marker_len; continue; } // need both types, no zeros
+
+        memcpy(key_buf + found * WX4B_KEY_SIZE, xored, WX4B_KEY_SIZE);
+        found++;
+        pos += marker_len;
     }
     return found;
 }
