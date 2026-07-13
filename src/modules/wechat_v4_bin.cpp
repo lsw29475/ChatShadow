@@ -158,36 +158,69 @@ static const uint8_t WX4B_INTERNAL_KEY[32] = {
     0xfa,0x79,0xf6,0x2c,0x6e,0x2e,0x7c,0xe7
 };
 
-// Scan: find marker & scan ±512KB, filter raw data, XOR with internal_key
-// Short marker catches both variants (some dumps have "_count" suffix, some don't)
+// Forward decl
+static int scan_window(const uint8_t* dump, int64_t dump_size, int64_t center,
+                        int window, uint8_t* key_buf, int max_keys);
+
+// Scan: find marker & scan ±512KB. Falls back to 3-word substrings if full not found.
 static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
                                           uint8_t* key_buf, int max_keys) {
-    const char marker[] = "g_voice_input_show_note_placeholder_text";
-    const int marker_len = strlen(marker);
-    const int window = 512 * 1024;
+    const int window_full = 512 * 1024;
+    const int window_frag = 1024 * 1024;  // ±1MB for fragments
+
+    const char* full_marker = "g_voice_input_show_note_placeholder_text_count";
+    const int full_len = strlen(full_marker);
+
+    // Phase 1: try full marker (with _count)
+    for (int64_t pos = 0; pos < dump_size - full_len; pos++) {
+        if (memcmp(dump + pos, full_marker, full_len) != 0) continue;
+        return scan_window(dump, dump_size, pos, window_full, key_buf, max_keys);
+    }
+
+    // Phase 2: try short marker (without _count — some dumps have this variant)
+    const char* short_marker = "g_voice_input_show_note_placeholder_text";
+    int sl = strlen(short_marker);
+    for (int64_t pos = 0; pos < dump_size - sl; pos++) {
+        if (memcmp(dump + pos, short_marker, sl) != 0) continue;
+        return scan_window(dump, dump_size, pos, window_full, key_buf, max_keys);
+    }
+
+    // Phase 3: fallback — 3-word substrings for fragmented memory
+    const char* frags[] = {
+        "g_voice_input", "voice_input_show",
+        "input_show_note", "show_note_placeholder",
+        "note_placeholder_text",
+    };
+    for (int m = 0; m < 5; m++) {
+        int fl = strlen(frags[m]);
+        for (int64_t pos = 0; pos < dump_size - fl; pos++) {
+            if (memcmp(dump + pos, frags[m], fl) != 0) continue;
+            return scan_window(dump, dump_size, pos, window_frag, key_buf, max_keys);
+        }
+    }
+    return 0;
+}
+
+// Helper: scan window around position, return count of candidates
+static int scan_window(const uint8_t* dump, int64_t dump_size, int64_t center,
+                        int window, uint8_t* key_buf, int max_keys) {
+    int64_t start = center - window;
+    int64_t end   = center + window;
+    if (start < 0) start = 0;
+    if (end > dump_size - WX4B_KEY_SIZE) end = dump_size - WX4B_KEY_SIZE;
 
     int found = 0;
-    for (int64_t pos = 0; pos < dump_size - marker_len && found < max_keys; pos++) {
-        if (memcmp(dump + pos, marker, marker_len) != 0) continue;
+    for (int64_t k = start; k <= end && found < max_keys; k += 1) {
+        const uint8_t* c = dump + k;
+        uint8_t freq[256] = {0};
+        bool dup = false;
+        for (int i = 0; i < WX4B_KEY_SIZE && !dup; i++)
+            if (++freq[c[i]] >= 3) dup = true;
+        if (dup) continue;
 
-        int64_t start = pos - window;
-        int64_t end   = pos + window;
-        if (start < 0) start = 0;
-        if (end > dump_size - WX4B_KEY_SIZE) end = dump_size - WX4B_KEY_SIZE;
-
-        for (int64_t k = start; k <= end && found < max_keys; k += 1) {
-            const uint8_t* c = dump + k;
-            uint8_t freq[256] = {0};
-            bool dup = false;
-            for (int i = 0; i < WX4B_KEY_SIZE && !dup; i++)
-                if (++freq[c[i]] >= 3) dup = true;
-            if (dup) continue;
-
-            for (int i = 0; i < WX4B_KEY_SIZE; i++)
-                key_buf[found * WX4B_KEY_SIZE + i] = c[i] ^ WX4B_INTERNAL_KEY[i];
-            found++;
-        }
-        pos += marker_len;
+        for (int i = 0; i < WX4B_KEY_SIZE; i++)
+            key_buf[found * WX4B_KEY_SIZE + i] = c[i] ^ WX4B_INTERNAL_KEY[i];
+        found++;
     }
     return found;
 }
