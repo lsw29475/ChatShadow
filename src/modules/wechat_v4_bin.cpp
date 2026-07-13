@@ -158,14 +158,12 @@ static const uint8_t WX4B_INTERNAL_KEY[32] = {
     0xfa,0x79,0xf6,0x2c,0x6e,0x2e,0x7c,0xe7
 };
 
-// Scan: find marker string, scan ±1MB window, XOR with internal_key
-// Even if offset varies between versions, 1MB window covers it safely.
-// Each candidate costs only a simple filter, then PBKDF2 verify in main loop.
+// Scan: find ALL marker hits, scan ±512KB around each, filter raw data
 static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
                                           uint8_t* key_buf, int max_keys) {
     const char marker[] = "g_voice_input_show_note_placeholder_text_count";
     const int marker_len = sizeof(marker) - 1;
-    const int window = 4 * 1024;  // ±4KB around marker
+    const int window = 512 * 1024;  // ±512KB
 
     int found = 0;
     for (int64_t pos = 0; pos < dump_size - marker_len && found < max_keys; pos++) {
@@ -178,11 +176,17 @@ static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
 
         for (int64_t k = start; k <= end && found < max_keys; k += 1) {
             const uint8_t* c = dump + k;
+            uint8_t freq[256] = {0};
+            bool dup = false;
+            for (int i = 0; i < WX4B_KEY_SIZE && !dup; i++)
+                if (++freq[c[i]] >= 3) dup = true;
+            if (dup) continue;
+
             for (int i = 0; i < WX4B_KEY_SIZE; i++)
                 key_buf[found * WX4B_KEY_SIZE + i] = c[i] ^ WX4B_INTERNAL_KEY[i];
             found++;
         }
-        break;  // only first marker hit — avoid flooding buffer
+        pos += marker_len;
     }
     return found;
 }
