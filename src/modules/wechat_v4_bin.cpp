@@ -158,12 +158,13 @@ static const uint8_t WX4B_INTERNAL_KEY[32] = {
     0xfa,0x79,0xf6,0x2c,0x6e,0x2e,0x7c,0xe7
 };
 
-// Scan: find ALL marker hits, scan ±512KB around each, filter raw data
+// Scan: find marker & scan ±512KB, filter raw data, XOR with internal_key
+// Short marker catches both variants (some dumps have "_count" suffix, some don't)
 static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
                                           uint8_t* key_buf, int max_keys) {
-    const char marker[] = "g_voice_input_show_note_placeholder_text_count";
-    const int marker_len = sizeof(marker) - 1;
-    const int window = 512 * 1024;  // ±512KB
+    const char marker[] = "g_voice_input_show_note_placeholder_text";
+    const int marker_len = strlen(marker);
+    const int window = 512 * 1024;
 
     int found = 0;
     for (int64_t pos = 0; pos < dump_size - marker_len && found < max_keys; pos++) {
