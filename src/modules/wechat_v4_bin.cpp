@@ -165,8 +165,8 @@ static int scan_window(const uint8_t* dump, int64_t dump_size, int64_t center,
 // Scan: find marker & scan ±512KB. Falls back to 3-word substrings if full not found.
 static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
                                           uint8_t* key_buf, int max_keys) {
-    const int window_full = 512 * 1024;
-    const int window_frag = 1024 * 1024;  // ±1MB for fragments
+    const int window_full = 4096;         // ±4KB around full marker
+    const int window_frag = 8192;         // ±8KB around fragment markers
 
     const char* full_marker = "g_voice_input_show_note_placeholder_text_count";
     const int full_len = strlen(full_marker);
@@ -189,9 +189,9 @@ static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
     const char* frags[] = {
         "g_voice_input", "voice_input_show",
         "input_show_note", "show_note_placeholder",
-        "note_placeholder_text",
+        "note_placeholder_text", "g_voiec_input",  // corrupted variant
     };
-    for (int m = 0; m < 5; m++) {
+    for (int m = 0; m < 6; m++) {
         int fl = strlen(frags[m]);
         for (int64_t pos = 0; pos < dump_size - fl; pos++) {
             if (memcmp(dump + pos, frags[m], fl) != 0) continue;
@@ -202,6 +202,7 @@ static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
 }
 
 // Helper: scan window around position, return count of candidates
+// Step by WX4B_KEY_SIZE (32) — non-overlapping blocks, 32x fewer candidates
 static int scan_window(const uint8_t* dump, int64_t dump_size, int64_t center,
                         int window, uint8_t* key_buf, int max_keys) {
     int64_t start = center - window;

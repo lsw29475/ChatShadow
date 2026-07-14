@@ -51,6 +51,7 @@ set(SOURCES
     src/common.cpp
     src/scanner.cpp
     src/modules/wechat.cpp
+    src/modules/wechat_v4_bin.cpp
     src/modules/qq_old.cpp
     src/modules/qq_nt.cpp
 )

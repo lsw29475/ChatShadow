@@ -232,6 +232,7 @@ bool run_crack(const char* mem_path, const char* db_path, const char* task_dir,
     }
 
     if (!result.found) {
+        printf("No key found via YARA scan, running byte-by-byte scan...\n");
         // Configure and run byte-by-byte scan
         ScanConfig config;
         memset(&config, 0, sizeof(config));
