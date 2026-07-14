@@ -159,48 +159,50 @@ static const uint8_t WX4B_INTERNAL_KEY[32] = {
 };
 
 // Forward decl
-static int scan_window(const uint8_t* dump, int64_t dump_size, int64_t center,
+static int scan_window_to(const uint8_t* dump, int64_t dump_size, int64_t center,
                         int window, uint8_t* key_buf, int max_keys);
 
-// Scan: try full marker, then fragments. Scan ALL hits within each phase.
+// Scan: try full marker first, then fragments. All hits contribute candidates.
 static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
                                           uint8_t* key_buf, int max_keys) {
     const int window_full = 512 * 1024;
 
-    // Phase 1: try full marker (with _count suffix)
     const char* markers[] = {
         "g_voice_input_show_note_placeholder_text_count",
         "g_voice_input_show_note_placeholder_text",
     };
-    for (int m = 0; m < 2; m++) {
-        int ml = strlen(markers[m]);
-        for (int64_t pos = 0; pos < dump_size - ml; pos++) {
-            if (memcmp(dump + pos, markers[m], ml) != 0) continue;
-            int n = scan_window(dump, dump_size, pos, window_full, key_buf, max_keys);
-            if (n > 0) return n;
-        }
-    }
-
-    // Phase 2: fragments — try ALL fragment markers before giving up
     const char* frags[] = {
         "g_voice_input", "voice_input_show",
         "input_show_note", "show_note_placeholder",
         "note_placeholder_text", "g_voiec_input",
     };
-    for (int m = 0; m < 6; m++) {
-        int fl = strlen(frags[m]);
-        for (int64_t pos = 0; pos < dump_size - fl; pos++) {
-            if (memcmp(dump + pos, frags[m], fl) != 0) continue;
-            int n = scan_window(dump, dump_size, pos, window_full, key_buf, max_keys);
-            if (n > 0) return n;
+
+    int found = 0;
+
+    // Scan full markers
+    for (int m = 0; m < 2 && found < max_keys; m++) {
+        int ml = strlen(markers[m]);
+        for (int64_t pos = 0; pos < dump_size - ml && found < max_keys; pos++) {
+            if (memcmp(dump + pos, markers[m], ml) != 0) continue;
+            found += scan_window_to(dump, dump_size, pos, window_full,
+                                    key_buf + found * WX4B_KEY_SIZE, max_keys - found);
         }
     }
-    return 0;
+
+    // Fragment fallback
+    for (int m = 0; m < 6 && found < max_keys; m++) {
+        int fl = strlen(frags[m]);
+        for (int64_t pos = 0; pos < dump_size - fl && found < max_keys; pos++) {
+            if (memcmp(dump + pos, frags[m], fl) != 0) continue;
+            found += scan_window_to(dump, dump_size, pos, window_full,
+                                    key_buf + found * WX4B_KEY_SIZE, max_keys - found);
+        }
+    }
+    return found;  // total candidates from all phases
 }
 
-// Helper: scan window around position, return count of candidates
-// Step by WX4B_KEY_SIZE (32) — non-overlapping blocks, 32x fewer candidates
-static int scan_window(const uint8_t* dump, int64_t dump_size, int64_t center,
+// Helper: scan window around position, write to buf, return count
+static int scan_window_to(const uint8_t* dump, int64_t dump_size, int64_t center,
                         int window, uint8_t* key_buf, int max_keys) {
     int64_t start = center - window;
     int64_t end   = center + window;
