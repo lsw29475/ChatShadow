@@ -165,7 +165,7 @@ static int scan_window_to(const uint8_t* dump, int64_t dump_size, int64_t center
 // Scan: try full marker first, then fragments. All hits contribute candidates.
 static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
                                           uint8_t* key_buf, int max_keys) {
-    const int window_full = 512 * 1024;
+    const int window_full = 8 * 1024;   // ±8KB — XOR data always within ~1KB of marker
 
     const char* markers[] = {
         "g_voice_input_show_note_placeholder_text_count",
@@ -174,7 +174,7 @@ static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
     const char* frags[] = {
         "g_voice_input", "voice_input_show",
         "input_show_note", "show_note_placeholder",
-        "note_placeholder_text", "g_voiec_input",
+        "note_placeholder_text",
     };
 
     int found = 0;

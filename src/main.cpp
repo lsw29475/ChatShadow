@@ -211,7 +211,7 @@ bool run_crack(const char* mem_path, const char* db_path, const char* task_dir,
     std::string dec_db_path = path_join(task_dir, "DecDB.db");
 
     if (module->scan_candidates) {
-        const int max_candidates = 50000;
+        const int max_candidates = 2000;
         uint8_t* key_buf = (uint8_t*)malloc(max_candidates * module->key_size);
         int n = module->scan_candidates(dump_data, dump_size, key_buf, max_candidates);
         printf("YARA pre-scan: %d candidates found\n", n);
