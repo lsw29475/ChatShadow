@@ -162,40 +162,37 @@ static const uint8_t WX4B_INTERNAL_KEY[32] = {
 static int scan_window(const uint8_t* dump, int64_t dump_size, int64_t center,
                         int window, uint8_t* key_buf, int max_keys);
 
-// Scan: find marker & scan ±512KB. Falls back to 3-word substrings if full not found.
+// Scan: try full marker, then fragments. Scan ALL hits within each phase.
 static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
                                           uint8_t* key_buf, int max_keys) {
-    const int window_full = 4096;         // ±4KB around full marker
-    const int window_frag = 8192;         // ±8KB around fragment markers
+    const int window_full = 512 * 1024;
 
-    const char* full_marker = "g_voice_input_show_note_placeholder_text_count";
-    const int full_len = strlen(full_marker);
-
-    // Phase 1: try full marker (with _count)
-    for (int64_t pos = 0; pos < dump_size - full_len; pos++) {
-        if (memcmp(dump + pos, full_marker, full_len) != 0) continue;
-        return scan_window(dump, dump_size, pos, window_full, key_buf, max_keys);
+    // Phase 1: try full marker (with _count suffix)
+    const char* markers[] = {
+        "g_voice_input_show_note_placeholder_text_count",
+        "g_voice_input_show_note_placeholder_text",
+    };
+    for (int m = 0; m < 2; m++) {
+        int ml = strlen(markers[m]);
+        for (int64_t pos = 0; pos < dump_size - ml; pos++) {
+            if (memcmp(dump + pos, markers[m], ml) != 0) continue;
+            int n = scan_window(dump, dump_size, pos, window_full, key_buf, max_keys);
+            if (n > 0) return n;
+        }
     }
 
-    // Phase 2: try short marker (without _count — some dumps have this variant)
-    const char* short_marker = "g_voice_input_show_note_placeholder_text";
-    int sl = strlen(short_marker);
-    for (int64_t pos = 0; pos < dump_size - sl; pos++) {
-        if (memcmp(dump + pos, short_marker, sl) != 0) continue;
-        return scan_window(dump, dump_size, pos, window_full, key_buf, max_keys);
-    }
-
-    // Phase 3: fallback — 3-word substrings for fragmented memory
+    // Phase 2: fragments — try ALL fragment markers before giving up
     const char* frags[] = {
         "g_voice_input", "voice_input_show",
         "input_show_note", "show_note_placeholder",
-        "note_placeholder_text", "g_voiec_input",  // corrupted variant
+        "note_placeholder_text", "g_voiec_input",
     };
     for (int m = 0; m < 6; m++) {
         int fl = strlen(frags[m]);
         for (int64_t pos = 0; pos < dump_size - fl; pos++) {
             if (memcmp(dump + pos, frags[m], fl) != 0) continue;
-            return scan_window(dump, dump_size, pos, window_frag, key_buf, max_keys);
+            int n = scan_window(dump, dump_size, pos, window_full, key_buf, max_keys);
+            if (n > 0) return n;
         }
     }
     return 0;
