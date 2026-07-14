@@ -1,7 +1,0 @@
-/home/wzj/project/chatshadow/CMakeFiles/chatshadow.dir
-/home/wzj/project/chatshadow/CMakeFiles/edit_cache.dir
-/home/wzj/project/chatshadow/CMakeFiles/rebuild_cache.dir
-/home/wzj/project/chatshadow/CMakeFiles/list_install_components.dir
-/home/wzj/project/chatshadow/CMakeFiles/install.dir
-/home/wzj/project/chatshadow/CMakeFiles/install/local.dir
-/home/wzj/project/chatshadow/CMakeFiles/install/strip.dir
