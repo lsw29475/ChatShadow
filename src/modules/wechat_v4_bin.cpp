@@ -198,6 +198,18 @@ static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
                                     key_buf + found * WX4B_KEY_SIZE, max_keys - found);
         }
     }
+
+    // clicfg_wxechat — high frequency, forward 5KB window via symmetric call
+    {
+        const char* clicfg = "clicfg_wxechat";
+        int cl = strlen(clicfg);
+        for (int64_t pos = 0; pos < dump_size - cl && found < max_keys; pos++) {
+            if (memcmp(dump + pos, clicfg, cl) != 0) continue;
+            found += scan_window_to(dump, dump_size, pos + 2560, 2560,
+                                    key_buf + found * WX4B_KEY_SIZE, max_keys - found);
+        }
+    }
+
     return found;  // total candidates from all phases
 }
 
