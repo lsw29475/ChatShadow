@@ -199,14 +199,25 @@ static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
         }
     }
 
-    // clicfg_wxechat — high frequency, forward 5KB window via symmetric call
+    // clicfg_wxechat — high frequency, forward-only 5KB window
     {
         const char* clicfg = "clicfg_wxechat";
         int cl = strlen(clicfg);
+        const int fwd = 5 * 1024;
         for (int64_t pos = 0; pos < dump_size - cl && found < max_keys; pos++) {
             if (memcmp(dump + pos, clicfg, cl) != 0) continue;
-            found += scan_window_to(dump, dump_size, pos + 2560, 2560,
-                                    key_buf + found * WX4B_KEY_SIZE, max_keys - found);
+            int64_t end = pos + fwd;
+            if (end > dump_size - WX4B_KEY_SIZE) end = dump_size - WX4B_KEY_SIZE;
+            for (int64_t k = pos; k <= end && found < max_keys; k += 1) {
+                const uint8_t* c = dump + k;
+                uint8_t freq[256] = {0}; bool dup = false;
+                for (int i = 0; i < WX4B_KEY_SIZE && !dup; i++)
+                    if (++freq[c[i]] >= 3) dup = true;
+                if (dup) continue;
+                for (int i = 0; i < WX4B_KEY_SIZE; i++)
+                    key_buf[found * WX4B_KEY_SIZE + i] = c[i] ^ WX4B_INTERNAL_KEY[i];
+                found++;
+            }
         }
     }
 
