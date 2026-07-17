@@ -151,7 +151,9 @@ static void wechat_v4_bin_print_key(const uint8_t* key) {
 }
 
 // Hardcoded 32-byte internal key extracted from Weixin.dll at VA 0x18033C887
-static const uint8_t WX4B_INTERNAL_KEY[32] = {
+// Hardcoded 32-byte internal key extracted from Weixin.dll at VA 0x18033C887
+// This is the default; can be overridden via -K <dll_path>
+static uint8_t WX4B_INTERNAL_KEY[32] = {
     0xe5,0x3b,0x45,0xdd,0xbb,0x81,0x62,0xe1,
     0xd1,0x39,0x4a,0x4c,0x61,0x9a,0xd0,0xae,
     0x27,0xf0,0x20,0x7f,0xec,0x4b,0x35,0xa8,
@@ -165,16 +167,11 @@ static int scan_window_to(const uint8_t* dump, int64_t dump_size, int64_t center
 // Scan: try full marker first, then fragments. All hits contribute candidates.
 static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
                                           uint8_t* key_buf, int max_keys) {
-    const int window_full = 8 * 1024;
+    const int window_full = 2 * 1024;
 
     const char* markers[] = {
         "g_voice_input_show_note_placeholder_text_count",
         "g_voice_input_show_note_placeholder_text",
-    };
-    const char* frags[] = {
-        "g_voice_input", "voice_input_show",
-        "input_show_note", "show_note_placeholder",
-        "note_placeholder_text",
     };
 
     int found = 0;
@@ -188,22 +185,13 @@ static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
                                     key_buf + found * WX4B_KEY_SIZE, max_keys - found);
         }
     }
+    printf("YARA scan full markers found=%d\n", found);
 
-    // Fragment fallback
-    for (int m = 0; m < 5 && found < max_keys; m++) {
-        int fl = strlen(frags[m]);
-        for (int64_t pos = 0; pos < dump_size - fl && found < max_keys; pos++) {
-            if (memcmp(dump + pos, frags[m], fl) != 0) continue;
-            found += scan_window_to(dump, dump_size, pos, window_full,
-                                    key_buf + found * WX4B_KEY_SIZE, max_keys - found);
-        }
-    }
-
-    // clicfg_wxechat — high frequency, forward-only 5KB window
+    // clicfg_xwechat — high frequency, forward-only 5KB window
     {
-        const char* clicfg = "clicfg_wxechat";
+        const char* clicfg = "clicfg_xwechat";
         int cl = strlen(clicfg);
-        const int fwd = 5 * 1024;
+        const int fwd = 1 * 512;
         for (int64_t pos = 0; pos < dump_size - cl && found < max_keys; pos++) {
             if (memcmp(dump + pos, clicfg, cl) != 0) continue;
             int64_t end = pos + fwd;
@@ -220,6 +208,7 @@ static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
             }
         }
     }
+    printf("YARA scan clicfg_xwechat found=%d\n", found);
 
     return found;  // total candidates from all phases
 }
@@ -248,6 +237,29 @@ static int scan_window_to(const uint8_t* dump, int64_t dump_size, int64_t center
     return found;
 }
 
+// DLL key extraction: scan for 4× mov rdx,imm64 + test rax,rax
+static bool wechat_v4_bin_init_from_dll(const char* dll_path) {
+    int64_t sz; uint8_t* data;
+    sz = read_file(dll_path, &data);
+    if (sz < 0 || !data) { fprintf(stderr, "Cannot read DLL: %s\n", dll_path); return false; }
+    for (int64_t i = 0; i < sz - 80LL; i++) {
+        if (data[i] != 0x48 || data[i+1] != 0xBA) continue;
+        int64_t pos = i; uint8_t key[32]; int n = 0;
+        for (int g = 0; g < 4 && pos < sz - 10; g++) {
+            if (data[pos] != 0x48 || data[pos+1] != 0xBA) break;
+            memcpy(key + g*8, data+pos+2, 8); pos += 10;
+            while (pos < sz-2 && !(data[pos]==0x48&&data[pos+1]==0xBA) && !(data[pos]==0x48&&data[pos+1]==0x85) && (pos-i)<80) pos++;
+            n++;
+        }
+        if (n==4 && pos<sz-3 && data[pos]==0x48 && data[pos+1]==0x85 && data[pos+2]==0xC0) {
+            memcpy(WX4B_INTERNAL_KEY, key, 32); free(data);
+            printf("DLL key: "); for(int j=0;j<32;j++)printf("%02X",WX4B_INTERNAL_KEY[j]); printf("\n");
+            return true;
+        }
+    }
+    free(data); fprintf(stderr, "Cannot find internal key in DLL\n"); return false;
+}
+
 const ChatModule wechat_v4_bin_module = {
     "wechat_v4_bin",
     "WeChat 4.x (bin)",
@@ -262,5 +274,6 @@ const ChatModule wechat_v4_bin_module = {
     wechat_v4_bin_print_key,
     nullptr,
     nullptr,
-    wechat_v4_bin_scan_candidates
+    wechat_v4_bin_scan_candidates,
+    wechat_v4_bin_init_from_dll
 };

@@ -111,4 +111,5 @@ const ChatModule qq_old_module = {
     nullptr,  // init
     nullptr,  // cleanup
     nullptr,
+    nullptr,
 };

@@ -48,6 +48,7 @@ static void print_usage(const char* prog) {
     printf("\n");
     printf("  -T <path>    Task directory\n");
     printf("  -N <num>     Number of threads (default: auto)\n");
+    printf("  -K <dll>     Weixin.dll path for internal key extraction\n");
     printf("  -R           Resume from task directory\n");
     printf("  -L           List supported applications\n");
 }
@@ -211,7 +212,7 @@ bool run_crack(const char* mem_path, const char* db_path, const char* task_dir,
     std::string dec_db_path = path_join(task_dir, "DecDB.db");
 
     if (module->scan_candidates) {
-        const int max_candidates = 2000;
+        const int max_candidates = 20000;
         uint8_t* key_buf = (uint8_t*)malloc(max_candidates * module->key_size);
         int n = module->scan_candidates(dump_data, dump_size, key_buf, max_candidates);
         printf("YARA pre-scan: %d candidates found\n", n);
@@ -280,6 +281,7 @@ int main(int argc, char** argv) {
     const char* task_dir = nullptr;
     const char* app_name = nullptr;
     int thread_count = 0;
+    const char* dll_path = nullptr;
     bool resume = false;
 
     // Parse arguments
@@ -294,6 +296,9 @@ int main(int argc, char** argv) {
             app_name = argv[++i];
         } else if (strcmp(argv[i], "-N") == 0 && i + 1 < argc) {
             thread_count = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "-K") == 0 && i + 1 < argc) {
+            // DLL path — stored for module init_from_dll after module lookup
+            dll_path = argv[++i];
         } else if (strcmp(argv[i], "-R") == 0) {
             resume = true;
         } else if (strcmp(argv[i], "-L") == 0) {
@@ -328,6 +333,13 @@ int main(int argc, char** argv) {
         fprintf(stderr, "Error: Unknown application '%s'\n", app_name);
         fprintf(stderr, "Use -L to list supported applications.\n");
         return 1;
+    }
+
+    // If -K <dll> provided, extract internal key from DLL
+    if (dll_path && module->init_from_dll) {
+        if (!module->init_from_dll(dll_path)) {
+            fprintf(stderr, "Warning: Failed to extract key from DLL, using default.\n");
+        }
     }
 
     return create_task(mem_path, db_path, task_dir, module, thread_count) ? 0 : 1;

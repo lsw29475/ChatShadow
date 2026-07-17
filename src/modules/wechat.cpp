@@ -149,4 +149,5 @@ const ChatModule wechat_module = {
     nullptr,  // init
     nullptr,  // cleanup
     nullptr,
+    nullptr,
 };

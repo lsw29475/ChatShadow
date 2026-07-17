@@ -191,4 +191,5 @@ const ChatModule qq_nt_module = {
     qq_nt_init,
     qq_nt_cleanup,
     nullptr,
+    nullptr,
 };

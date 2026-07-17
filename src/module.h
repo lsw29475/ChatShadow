@@ -51,6 +51,10 @@ typedef struct ChatModule {
     // max_keys: maximum number of keys to extract.
     int (*scan_candidates)(const uint8_t* dump, int64_t dump_size,
                            uint8_t* key_buf, int max_keys);
+
+    // Optional: extract internal key from Weixin.dll (for WeChat 4.x).
+    // Returns true if a 32-byte key was found via mov-rdx pattern scan.
+    bool (*init_from_dll)(const char* dll_path);
 } ChatModule;
 
 #ifdef __cplusplus
