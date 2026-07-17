@@ -190,7 +190,7 @@ static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
     }
 
     // Fragment fallback
-    for (int m = 0; m < 6 && found < max_keys; m++) {
+    for (int m = 0; m < 5 && found < max_keys; m++) {
         int fl = strlen(frags[m]);
         for (int64_t pos = 0; pos < dump_size - fl && found < max_keys; pos++) {
             if (memcmp(dump + pos, frags[m], fl) != 0) continue;
