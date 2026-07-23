@@ -169,21 +169,16 @@ static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
                                           uint8_t* key_buf, int max_keys) {
     const int window_full = 2 * 1024;
 
-    const char* markers[] = {
-        "g_voice_input_show_note_placeholder_text_count",
-        "g_voice_input_show_note_placeholder_text",
-    };
+    const char* marker = "g_voice_input_show_note_placeholder_text";
+    int ml = strlen(marker);
 
     int found = 0;
 
-    // Scan full markers
-    for (int m = 0; m < 2 && found < max_keys; m++) {
-        int ml = strlen(markers[m]);
-        for (int64_t pos = 0; pos < dump_size - ml && found < max_keys; pos++) {
-            if (memcmp(dump + pos, markers[m], ml) != 0) continue;
-            found += scan_window_to(dump, dump_size, pos, window_full,
-                                    key_buf + found * WX4B_KEY_SIZE, max_keys - found);
-        }
+    // Scan full marker
+    for (int64_t pos = 0; pos < dump_size - ml && found < max_keys; pos++) {
+        if (memcmp(dump + pos, marker, ml) != 0) continue;
+        found += scan_window_to(dump, dump_size, pos, window_full,
+                                key_buf + found * WX4B_KEY_SIZE, max_keys - found);
     }
     printf("YARA scan full markers found=%d\n", found);
 
@@ -191,7 +186,7 @@ static int wechat_v4_bin_scan_candidates(const uint8_t* dump, int64_t dump_size,
     {
         const char* clicfg = "clicfg_xwechat";
         int cl = strlen(clicfg);
-        const int fwd = 1 * 512;
+        const int fwd = 1 * 2048;
         for (int64_t pos = 0; pos < dump_size - cl && found < max_keys; pos++) {
             if (memcmp(dump + pos, clicfg, cl) != 0) continue;
             int64_t end = pos + fwd;
